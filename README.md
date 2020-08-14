@@ -6,6 +6,9 @@
 
  [![Build Status](https://travis-ci.org/xia-chu/ZLMediaKit.svg?branch=master)](https://travis-ci.org/xia-chu/ZLMediaKit)
 
+## 注意
+
+- 如要克隆本仓库，还需克隆作为子模块的另外两个仓库 ———— ZLToolKit 和 media-server。
 
 ## 项目特点
 
