@@ -1,10 +1,10 @@
-﻿include_directories(include source)
+include_directories(include source)
 
 file(GLOB api_src_list include/*.h source/*.cpp source/*.h source/*.c)
 
 if (IOS)
     add_library(mk_api STATIC ${api_src_list})
-    target_link_libraries(mk_api ${LINK_LIB_LIST} jsoncpp)
+   
 else ()
     if(ENABLE_API_STATIC_LIB)
         add_library(mk_api STATIC ${api_src_list})
@@ -13,14 +13,13 @@ else ()
         endif ()
     else ()
         add_library(mk_api SHARED ${api_src_list})
+        target_link_libraries(mk_api ${LINK_LIB_LIST} jsoncpp)
         if (WIN32)
             add_definitions(-DMediaKitApi_EXPORTS)
         endif ()
     endif()
-    target_link_libraries(mk_api ${LINK_LIB_LIST} jsoncpp)
-    add_subdirectory(tests)
-
-    file(GLOB api_header_list include/*.h)
-    install(FILES ${api_header_list} DESTINATION ${INSTALL_PATH_INCLUDE})
-    install(TARGETS mk_api ARCHIVE DESTINATION ${INSTALL_PATH_LIB} LIBRARY DESTINATION ${INSTALL_PATH_LIB})
 endif ()
+
+ if (ENABLE_API_TEST)
+    add_subdirectory(tests)
+ endif ()
