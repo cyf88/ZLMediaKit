@@ -14,7 +14,7 @@ using namespace std;
 
 namespace mediakit {
 
-HlsMaker::HlsMaker(float seg_duration, uint32_t seg_number, uint32_t seg_keep) {
+HlsMaker::HlsMaker(float seg_duration, uint32_t seg_number, bool seg_keep) {
     //最小允许设置为0，0个切片代表点播
     _seg_number = seg_number;
     _seg_duration = seg_duration;
@@ -106,7 +106,7 @@ void HlsMaker::delOldSegment() {
     if (_file_index > _seg_number) {
         _seg_dur_list.pop_front();
     }
-    if (_seg_keep == 1) {
+    if (_seg_keep) {
         //如果设置为一直保存，就不删除
         return;
     }
@@ -154,7 +154,7 @@ bool HlsMaker::isLive() {
 }
 
 bool HlsMaker::isKeep() {
-    return _seg_keep == 1;
+    return _seg_keep;
 }
 void HlsMaker::clear() {
     _file_index = 0;

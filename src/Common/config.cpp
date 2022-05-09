@@ -262,7 +262,7 @@ const string kDeleteDelaySec = HLS_FIELD"deleteDelaySec";
 static onceToken token([](){
     mINI::Instance()[kSegmentDuration] = 2;
     mINI::Instance()[kSegmentNum] = 3;
-    mINI::Instance()[kSegmentKeep] = 0;
+    mINI::Instance()[kSegmentKeep] = false;
     mINI::Instance()[kSegmentRetain] = 5;
     mINI::Instance()[kFileBufSize] = 64 * 1024;
     mINI::Instance()[kFilePath] = "./www";
