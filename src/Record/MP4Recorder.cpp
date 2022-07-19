@@ -118,12 +118,7 @@ bool MP4Recorder::inputFrame(const Frame::Ptr &frame) {
     }
 
     if (_muxer) {
-        if (_last_dts==0)
-        {
-           _last_dts = frame->dts();
-        }
-		auto duration = frame->dts() - _last_dts;
-        _info.time_len = int(duration/1000); //记录上一帧
+         _info.time_len = (float) (::time(NULL) - info.start_time);
         //生成mp4文件
         return _muxer->inputFrame(frame);
     }
