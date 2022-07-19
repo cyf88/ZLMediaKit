@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
@@ -70,7 +70,7 @@ void MP4Recorder::asyncClose() {
     auto info = _info;
     WorkThreadPool::Instance().getExecutor()->async([muxer, full_path_tmp, full_path, info]() mutable {
         //获取文件录制时间，放在关闭mp4之前是为了忽略关闭mp4执行时间
-        info.time_len = (float) (::time(NULL) - info.start_time);
+        //info.time_len = (float) (::time(NULL) - info.start_time);
         //关闭mp4非常耗时，所以要放在后台线程执行
         muxer->closeMP4();
         
@@ -118,6 +118,12 @@ bool MP4Recorder::inputFrame(const Frame::Ptr &frame) {
     }
 
     if (_muxer) {
+        if (_last_dts==0)
+        {
+           _last_dts = frame->dts();
+        }
+		auto duration = frame->dts() - _last_dts;
+        _info.time_len = int(duration/1000); //记录上一帧
         //生成mp4文件
         return _muxer->inputFrame(frame);
     }
