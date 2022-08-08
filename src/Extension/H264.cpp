@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
@@ -140,6 +140,17 @@ int H264Track::getVideoWidth() const {
 
 float H264Track::getVideoFps() const {
     return _fps;
+}
+
+void H264Track::flush() const {
+    int w = 0;
+    int h = 0;
+    float fps = 0.0;
+    if(getAVCInfo(_sps, w, h, fps)){
+        _width = w;
+        _height = h;
+        _fps = fps;
+    }
 }
 
 bool H264Track::ready() {
