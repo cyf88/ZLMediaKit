@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
@@ -150,6 +150,7 @@ public:
     int getVideoWidth() const override;
     int getVideoHeight() const override;
     float getVideoFps() const override;
+    void flush()  override;
     bool inputFrame(const Frame::Ptr &frame) override;
 
 private:
