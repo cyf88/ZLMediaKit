@@ -11,7 +11,8 @@
 #ifndef HLSRECORDER_H
 #define HLSRECORDER_H
 
-#include "HlsMakerImp.h"
+//#include "HlsMakerImp.h"
+#include "HlsMakerImpSub.h"
 #include "MPEG.h"
 
 namespace mediakit {
@@ -25,7 +26,8 @@ public:
         GET_CONFIG(bool, hlsKeep, Hls::kSegmentKeep);
         GET_CONFIG(uint32_t, hlsBufSize, Hls::kFileBufSize);
         GET_CONFIG(float, hlsDuration, Hls::kSegmentDuration);
-        _hls = std::make_shared<HlsMakerImp>(m3u8_file, params, hlsBufSize, hlsDuration, hlsNum, hlsKeep);
+       // _hls = std::make_shared<HlsMakerImp>(m3u8_file, params, hlsBufSize, hlsDuration, hlsNum, hlsKeep);
+        _hls = std::make_shared<HlsMakerImpSub>(m3u8_file, params, hlsBufSize, hlsDuration, hlsNum, hlsKeep);
         //清空上次的残余文件
         _hls->clearCache();
     }
@@ -73,7 +75,12 @@ public:
         //缓存尚未清空时，还允许触发inputFrame函数，以便及时清空缓存
         return hls_demand ? (_clear_cache ? true : _enabled) : true;
     }
+    void startRecord(bool flag) {
+        _hls->startRecord(flag);
+        _isRecord = flag;
+    }
 
+    bool getRecordFlag() { return _isRecord; }
 private:
     void onWrite(std::shared_ptr<toolkit::Buffer> buffer, uint64_t timestamp, bool key_pos) override {
         if (!buffer) {
@@ -86,7 +93,9 @@ private:
 private:
     bool _enabled = true;
     bool _clear_cache = false;
-    std::shared_ptr<HlsMakerImp> _hls;
+    //std::shared_ptr<HlsMakerImp> _hls;
+    std::shared_ptr<HlsMakerImpSub> _hls;
+    bool _isRecord = false;
 };
 }//namespace mediakit
 #endif //HLSRECORDER_H

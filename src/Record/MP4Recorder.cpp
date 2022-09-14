@@ -33,11 +33,11 @@ MP4Recorder::MP4Recorder(const string &path, const string &vhost, const string &
 }
 
 MP4Recorder::~MP4Recorder() {
-    closeFile();
+    //closeFile();
 }
 
 void MP4Recorder::createFile() {
-    closeFile();
+    //closeFile();
     auto date = getTimeStr("%Y-%m-%d");
     auto time = getTimeStr("%H-%M-%S");
     auto full_path_tmp = _folder_path + date + "/." + time + ".mp4";
@@ -93,7 +93,7 @@ void MP4Recorder::asyncClose() {
 
 void MP4Recorder::closeFile() {
     if (_muxer) {
-        asyncClose();
+        //asyncClose();
         _muxer = nullptr;
     }
 }
@@ -113,7 +113,7 @@ bool MP4Recorder::inputFrame(const Frame::Ptr &frame) {
             // 2、到了切片时间，并且只有音频
             // 3、到了切片时间，有视频并且遇到视频的关键帧
             _last_dts = 0;
-            createFile();
+            //createFile();
         }
     }
 
@@ -134,7 +134,7 @@ bool MP4Recorder::addTrack(const Track::Ptr &track) {
 }
 
 void MP4Recorder::resetTracks() {
-    closeFile();
+    //closeFile();
     _tracks.clear();
     _have_video = false;
 }
