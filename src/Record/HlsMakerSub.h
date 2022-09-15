@@ -116,7 +116,6 @@ private:
 
     //新增函数，实现录像功能
     std::string getTsFile(const std::string &file_content);
-    std::string getM3u8TSDuration(const std::string &file_content);
     std::string getM3u8TSBody(const std::string &file_content);
     void createM3u8FileForRecord();
 

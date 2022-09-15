@@ -10,6 +10,14 @@
 
  #include "Util/File.h"
 #include "HlsMakerSub.h"
+#if defined(_WIN32)
+#include <io.h>
+#define _access access
+#else
+#include <unistd.h>
+#endif // WIN32
+
+
 using namespace std;
 using namespace toolkit;
 
@@ -188,14 +196,6 @@ void HlsMakerSub::clear() {
     _last_file_name.clear();
 }
 
-std::string HlsMakerSub::getM3u8TSDuration(const std::string &file_content) {
-
-    size_t begin = file_content.find("#EXT-X-TARGETDURATION:");
-    size_t end = file_content.find("#EXT-X-MEDIA-SEQUENCE");
-    string duration = file_content.substr(begin, end - begin);
-    return duration;
-}
-
 std::string HlsMakerSub::getM3u8TSBody(const std::string &file_content) {
     
     string new_file = file_content;
@@ -232,13 +232,13 @@ std::string HlsMakerSub::getTsFile(const std::string &file_content) {
 
 void HlsMakerSub::createM3u8FileForRecord() {
     // 1.读取直播目录下的m3u8文件，获取当前的ts文件以及时长
-    string file_str = File::loadFile((getPathPrefix() + "/hls.m3u8").data());
-    if (file_str.empty()) {
+    string live_file = File::loadFile((getPathPrefix() + "/hls.m3u8").data());
+    if (live_file.empty()) {
         return;
     }
-    string duration = getM3u8TSDuration(file_str);
-    string body = getM3u8TSBody(file_str);
-    string ts_file_name = getTsFile(file_str); //ts_file: 2022-09-14_11-06-03
+
+    string body = getM3u8TSBody(live_file);
+    string ts_file_name = getTsFile(live_file); // ts_file: 2022-09-14_11-06-03
     string m3u8_file = getPathPrefix() + "/" + ts_file_name.substr(0, 10) + "/" + ts_file_name.substr(11, 2) + "/";
 
 
@@ -271,25 +271,24 @@ void HlsMakerSub::createM3u8FileForRecord() {
     //3.写m3u8文件
     string m3u8Header = "#EXTM3U\n"
                         "#EXT-X-PLAYLIST-TYPE:EVENT\n"
-                        "#EXT-X-VERSION:4\n";
-    file_str = File::loadFile(_m3u8_file_path.data());
-    //第一次进来，是空文件。
-    if (file_str == "") {
+                        "#EXT-X-VERSION:4\n"
+                        "#EXT-X-TARGETDURATION:2\n"
+                        "#EXT-X-MEDIA-SEQUENCE:0\n";
+    if (access(_m3u8_file_path.data(), 0) != 0) { //文件不存在
         auto file = File::create_file(_m3u8_file_path.data(), "wb");
         if (file) {
             fwrite(m3u8Header.data(), m3u8Header.size(), 1, file);
-            fwrite(duration.data(), duration.size(), 1, file);
-            fwrite("#EXT-X-MEDIA-SEQUENCE:0\n", string("#EXT-X-MEDIA-SEQUENCE:0\n").size(), 1, file);
             fwrite(body.data(), body.size(), 1, file);
             fclose(file);
         }
     } else {
-        //第二次进来，读取文件的内容，修改duration，追加body，保存文件
-        string old_duration = getM3u8TSDuration(file_str);
-        replace(file_str, old_duration, duration);
-        string new_str = file_str.substr(0, file_str.length() - 15);
-        new_str.append(body);
-        File::saveFile(new_str, _m3u8_file_path.data());
+        // 第二次进来，去掉 "#EXT-X-ENDLIST\n"，再重新追加file_content，保存文件
+        auto file = File::create_file(_m3u8_file_path.data(), "r+");
+        if (file) {
+            fseek(file, -15, SEEK_END);
+            fwrite(body.data(), body.size(), 1, file);
+            fclose(file);
+        } 
     }
 }
 
