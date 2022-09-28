@@ -37,7 +37,7 @@ HlsMakerSub::~HlsMakerSub() {
 }
 
 void HlsMakerSub::startRecord(bool isRecord) {
-    if (_is_record) {//检测到上一次是在录像，清空_segment_file_paths
+    if (_is_record) { //检测到上一次是在录像，清空_segment_file_paths
         _segment_file_paths.clear();
     }
 
@@ -267,6 +267,10 @@ void HlsMakerSub::createM3u8FileForRecord() {
     }
 
     _m3u8_file_num = 0;
+    if (_m3u8_file_path.empty()) {
+        WarnL << "create m3u8 file failed, _m3u8_file_path is empty."  ;
+        return;
+    }
 
     //3.写m3u8文件
     string m3u8Header = "#EXTM3U\n"

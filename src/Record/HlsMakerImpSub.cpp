@@ -101,6 +101,7 @@ string HlsMakerImpSub::onOpenSegment(uint64_t index) {
 
     if (!_file) {
         WarnL << "create file failed," << segment_path << " " << get_uv_errmsg();
+        return "";
     }
     if (_params.empty()) {
         return strDate + "/" + strHour + "/" + segment_name;
