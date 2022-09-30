@@ -15,6 +15,7 @@
 #define _access access
 #else
 #include <unistd.h>
+#include <dirent.h>
 #endif // WIN32
 
 
@@ -156,6 +157,7 @@ void HlsMakerSub::addNewSegment(uint64_t stamp) {
     _last_file_name = onOpenSegment(_file_index++);
     //记录本次切片的起始时间戳
     _last_seg_timestamp = _last_timestamp ? _last_timestamp : stamp;
+
 }
 
 void HlsMakerSub::flushLastSegment(bool eof) {
@@ -178,6 +180,7 @@ void HlsMakerSub::flushLastSegment(bool eof) {
     if (_is_record) {
         createM3u8FileForRecord();
     }
+    
 }
 
 bool HlsMakerSub::isLive() {
@@ -194,6 +197,7 @@ void HlsMakerSub::clear() {
     _last_seg_timestamp = 0;
     _seg_dur_list.clear();
     _last_file_name.clear();
+
 }
 
 std::string HlsMakerSub::getM3u8TSBody(const std::string &file_content) {
@@ -231,7 +235,7 @@ std::string HlsMakerSub::getTsFile(const std::string &file_content) {
 }
 
 void HlsMakerSub::createM3u8FileForRecord() {
-    // 1.读取直播目录下的m3u8文件，获取当前的ts文件以及时长
+    // 1.读取直播目录下的m3u8文件，获取当前的ts文件以及时长，并生成m3u8文件的路径
     string live_file = File::loadFile((getPathPrefix() + "/hls.m3u8").data());
     if (live_file.empty()) {
         return;
@@ -241,32 +245,35 @@ void HlsMakerSub::createM3u8FileForRecord() {
     string ts_file_name = getTsFile(live_file); // ts_file: 2022-09-14_11-06-03
     string m3u8_file = getPathPrefix() + "/" + ts_file_name.substr(0, 10) + "/" + ts_file_name.substr(11, 2) + "/";
 
-
     // 2.判断该目录下有没有m3u8文件，没有的话，生成第一个m3u8文件，有的话，重命名
-    File::scanDir(
-        m3u8_file,
-        [this](const string &path, bool isDir) -> bool {
-            if (!isDir && end_with(path, ".m3u8")) {
-                _m3u8_file_num++;
+    int handle = -1;
+    DIR *dir_info = opendir(m3u8_file.data());
+    struct dirent *dir_entry;
+    if (dir_info) {
+        while ((dir_entry =readdir(dir_info)) != NULL) {
+            if (end_with(dir_entry->d_name, ".m3u8")) {
+                handle = 0;
+                break;
             }
-            return true;
-        },
-        false);
-
-    if (_m3u8_file_num == 0) { //第一次播放流
-        _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
-        _is_close_stream = false;
-    } else { //断流过，一次以上播放
-        if (_is_close_stream) {
-            _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
-            _is_close_stream = false;
         }
-        if (_m3u8_file_path.length() == 0) { //服务重启后，进来，_m3u8_file_path为空
-            _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
-        }
+        closedir(dir_info);
+    } else {
+        return;
     }
 
-    _m3u8_file_num = 0;
+   if (-1 == handle) {//第一次播放流
+        _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
+        _is_close_stream = false;
+    } else {//断流过，一次以上播放
+       if (_is_close_stream) {
+           _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
+           _is_close_stream = false;
+       }
+       if (_m3u8_file_path.length() == 0) { //服务重启后，进来，_m3u8_file_path为空
+           _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
+       }
+   }
+
     if (_m3u8_file_path.empty()) {
         WarnL << "create m3u8 file failed, _m3u8_file_path is empty."  ;
         return;
@@ -278,6 +285,7 @@ void HlsMakerSub::createM3u8FileForRecord() {
                         "#EXT-X-VERSION:4\n"
                         "#EXT-X-TARGETDURATION:2\n"
                         "#EXT-X-MEDIA-SEQUENCE:0\n";
+
     if (access(_m3u8_file_path.data(), 0) != 0) { //文件不存在
         auto file = File::create_file(_m3u8_file_path.data(), "wb");
         if (file) {

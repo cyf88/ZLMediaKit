@@ -84,9 +84,9 @@ string HlsMakerImpSub::onOpenSegment(uint64_t index) {
     if (isLive()) {
 
         GET_CONFIG(uint32_t, segRetain, Hls::kSegmentRetain);
-        GET_CONFIG(uint32_t, segKeep, Hls::kSegmentNum);
-        if (_segment_file_paths.size() > segRetain + segKeep) {
-            _segment_file_paths.erase(index - segRetain - segKeep -1);
+        GET_CONFIG(uint32_t, segNum, Hls::kSegmentNum);
+        if (_segment_file_paths.size() > segRetain + segNum) {
+            _segment_file_paths.erase(index - segRetain - segNum - 1);
         }
         _segment_file_paths.emplace(index, segment_path);
     }

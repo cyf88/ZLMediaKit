@@ -130,7 +130,6 @@ private:
     std::deque<std::tuple<int,std::string> > _seg_dur_list;
     bool _is_record = false;
     bool _is_close_stream = false;
-    int _m3u8_file_num = 0;
     std::string _m3u8_file_path;
 
 public:
