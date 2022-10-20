@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
@@ -92,6 +92,12 @@ public:
      * 返回视频fps
      */
     virtual float getVideoFps() const {return 0;};
+
+    /**
+     * 刷新宽高帧率
+     */
+	
+	virtual void  flush()   {return;};
 };
 
 /**
