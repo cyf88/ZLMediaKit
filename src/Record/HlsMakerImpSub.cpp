@@ -26,7 +26,6 @@ HlsMakerImpSub::HlsMakerImpSub(
                          float seg_duration,
                          uint32_t seg_number,
                          bool seg_keep):HlsMakerSub(seg_duration, seg_number, seg_keep) {
-    _poller = EventPollerPool::Instance().getPoller();
     _path_prefix = m3u8_file.substr(0, m3u8_file.rfind('/'));
     _path_hls = m3u8_file;
     _params = params;
@@ -55,22 +54,24 @@ void HlsMakerImpSub::clearCache(bool immediately, bool eof) {
 
     clear();
     _file = nullptr;
+    //删除_segment_file_paths路径对应的直播文件
+    for (auto it : _segment_file_paths) {
+        auto ts_path = it.second;
+        File::delete_file(ts_path.data());
+    }
     _segment_file_paths.clear();
 
-    //删除缓存的m3u8文件
-    File::delete_file((_path_prefix + "/hls.m3u8").data() );
+    //程序异常退出的情况下，直播的8个ts文件还是无法删除，
+    //这里先删除掉m3u8文件对应的3个ts文件。还有保留的5个ts文件无法删除，能删除几个是几个吧。
+    fstream file(_path_prefix + "/hls.m3u8");
+    string data;
+    while (getline(file,data)) {
+        string ts_path = _path_prefix + "/" + data;
+        File::delete_file(ts_path.data());
+    }
 
-    ////hls直播才删除文件
-    //GET_CONFIG(uint32_t, delay, Hls::kDeleteDelaySec);
-    //if (!delay || immediately) {
-    //    File::delete_file(_path_prefix.data());
-    //} else {
-    //    auto path_prefix = _path_prefix;
-    //    _poller->doDelayTask(delay * 1000, [path_prefix]() {
-    //        File::delete_file(path_prefix.data());
-    //        return 0;
-    //    });
-    //}
+    //删除缓存的m3u8文件
+    File::delete_file((_path_prefix + "/hls.m3u8").data());
 }
 
 string HlsMakerImpSub::onOpenSegment(uint64_t index) {
@@ -81,13 +82,7 @@ string HlsMakerImpSub::onOpenSegment(uint64_t index) {
     auto strTime = getTimeStr("%M-%S");
     segment_name = StrPrinter << strDate + "_" + strHour + "-" + strTime << ".ts";
     segment_path = _path_prefix + "/" + strDate + "/" + strHour + "/" + segment_name;
-    if (isLive()) {
-
-        GET_CONFIG(uint32_t, segRetain, Hls::kSegmentRetain);
-        GET_CONFIG(uint32_t, segNum, Hls::kSegmentNum);
-        if (_segment_file_paths.size() > segRetain + segNum) {
-            _segment_file_paths.erase(index - segRetain - segNum - 1);
-        }
+    if ((!isKeep())) {
         _segment_file_paths.emplace(index, segment_path);
     }
     

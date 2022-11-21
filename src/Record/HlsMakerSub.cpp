@@ -30,6 +30,7 @@ HlsMakerSub::HlsMakerSub(float seg_duration, uint32_t seg_number, bool seg_keep)
     _seg_duration = seg_duration;
     _seg_keep = seg_keep;
     _is_record = false;
+    _poller = EventPollerPool::Instance().getPoller();
 }
 
 HlsMakerSub::~HlsMakerSub() {
@@ -38,8 +39,22 @@ HlsMakerSub::~HlsMakerSub() {
 }
 
 void HlsMakerSub::startRecord(bool isRecord) {
-    if (_is_record) { //检测到上一次是在录像，清空_segment_file_paths
+    //本来已经在录像，再次点击录像，或者本来已经停止录像，再次点击停止录像，直接返回
+    if (isRecord == _is_record) {
+        return;
+    }
+    //如果是录像，则删除之前直播的8个ts文件
+    if (isRecord) {
+        std::map<uint64_t, std::string> delete_file_paths = _segment_file_paths;
         _segment_file_paths.clear();
+        //删除_segment_file_paths路径对应的直播文件,过30s再删除，免得hls直播突然断掉
+        for (auto it : delete_file_paths) {
+            auto ts_path = it.second;
+            _poller->doDelayTask(30 * 1000, [ts_path]() {
+                File::delete_file(ts_path.data());
+                return 0;
+            });
+        }
     }
 
     if(isRecord) {

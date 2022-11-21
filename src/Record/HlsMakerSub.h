@@ -18,7 +18,7 @@
 #include "Util/File.h"
 #include "Util/util.h"
 #include "Util/logger.h"
-
+#include "ZLToolKit/src/Poller/EventPoller.h"
 namespace mediakit {
 
 class HlsMakerSub {
@@ -131,6 +131,7 @@ private:
     bool _is_record = false;
     bool _is_close_stream = false;
     std::string _m3u8_file_path;
+    toolkit::EventPoller::Ptr _poller;
 
 public:
     std::map<uint64_t /*index*/, std::string /*file_path*/> _segment_file_paths;

@@ -71,7 +71,6 @@ private:
     std::shared_ptr<FILE> _file;
     std::shared_ptr<char> _file_buf;
     HlsMediaSource::Ptr _media_src;
-    toolkit::EventPoller::Ptr _poller;
 
 };
 
