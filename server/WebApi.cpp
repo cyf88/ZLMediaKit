@@ -1483,43 +1483,44 @@ void installWebApi() {
         auto scan_path = File::absolutePath(MD5(allArgs["url"]).hexdigest(), snap_root) + "/";
         string new_snap = StrPrinter << scan_path << time(NULL) << ".jpeg";
 
-        File::scanDir(scan_path, [&](const string &path, bool isDir) {
-            if (isDir || !end_with(path, ".jpeg")) {
-                //忽略文件夹或其他类型的文件
-                return true;
+        if (expire_sec != 0){
+            File::scanDir(scan_path, [&](const string &path, bool isDir) {
+                if (isDir || !end_with(path, ".jpeg")) {
+                    //忽略文件夹或其他类型的文件
+                    return true;
+                }
+
+                //找到截图
+                auto tm = FindField(path.data() + scan_path.size(), nullptr, ".jpeg");
+                if (atoll(tm.data()) + expire_sec < time(NULL)) {
+                    //截图已经过期，改名，以便再次请求时，可以返回老截图
+                    rename(path.data(), new_snap.data());
+                    have_old_snap = true;
+                    return true;
+                }
+
+                //截图存在，且未过期，那么返回之
+                res_old_snap = true;
+                responseSnap(path, allArgs.getParser().getHeader(), invoker);
+                //中断遍历
+                return false;
+            });
+
+            if (res_old_snap) {
+                //已经回复了旧的截图
+                return;
             }
 
-            //找到截图
-            auto tm = FindField(path.data() + scan_path.size(), nullptr, ".jpeg");
-            if (atoll(tm.data()) + expire_sec < time(NULL)) {
-                //截图已经过期，改名，以便再次请求时，可以返回老截图
-                rename(path.data(), new_snap.data());
-                have_old_snap = true;
-                return true;
+            //无截图或者截图已经过期
+            if (!have_old_snap) {
+                //无过期截图，生成一个空文件，目的是顺便创建文件夹路径
+                //同时防止在FFmpeg生成截图途中不停的尝试调用该api多次启动FFmpeg进程
+                auto file = File::create_file(new_snap.data(), "wb");
+                if (file) {
+                    fclose(file);
+                }
             }
-
-            //截图存在，且未过期，那么返回之
-            res_old_snap = true;
-            responseSnap(path, allArgs.getParser().getHeader(), invoker);
-            //中断遍历
-            return false;
-        });
-
-        if (res_old_snap) {
-            //已经回复了旧的截图
-            return;
         }
-
-        //无截图或者截图已经过期
-        if (!have_old_snap) {
-            //无过期截图，生成一个空文件，目的是顺便创建文件夹路径
-            //同时防止在FFmpeg生成截图途中不停的尝试调用该api多次启动FFmpeg进程
-            auto file = File::create_file(new_snap.data(), "wb");
-            if (file) {
-                fclose(file);
-            }
-        }
-
         //启动FFmpeg进程，开始截图，生成临时文件，截图成功后替换为正式文件
         auto new_snap_tmp = new_snap + ".tmp";
         FFmpegSnap::makeSnap(allArgs["url"], new_snap_tmp, allArgs["timeout_sec"], [invoker, allArgs, new_snap, new_snap_tmp](bool success, const string &err_msg) {
