@@ -23,50 +23,11 @@
 
 namespace mediakit {
 
-class ProtocolOption {
-public:
-    ProtocolOption();
-
-    //是否开启转换为hls
-    bool enable_hls = false;
-    //是否开启MP4录制
-    bool enable_mp4 = false;
-    //是否将mp4录制当做观看者
-    bool mp4_as_player = false;
-    //是否开启转换为rtsp/webrtc
-    bool enable_rtsp = true;
-    //是否开启转换为rtmp/flv
-    bool enable_rtmp = true;
-    //是否开启转换为http-ts/ws-ts
-    bool enable_ts = true;
-    //是否开启转换为http-fmp4/ws-fmp4
-    bool enable_fmp4 = true;
-
-    //转协议是否开启音频
-    bool enable_audio = true;
-    //添加静音音频，在关闭音频时，此开关无效
-    bool add_mute_audio = true;
-
-    //mp4录制保存路径
-    std::string mp4_save_path;
-    //mp4切片大小，单位秒
-    size_t mp4_max_second = 0;
-
-    //hls录制保存路径
-    std::string hls_save_path;
-
-    //断连续推延时，单位毫秒，默认采用配置文件
-    uint32_t continue_push_ms;
-    
-    //时间戳修复这一路流标志位
-    bool modify_stamp;
-};
-
 class MultiMediaSourceMuxer : public MediaSourceEventInterceptor, public MediaSink, public std::enable_shared_from_this<MultiMediaSourceMuxer>{
 public:
     typedef std::shared_ptr<MultiMediaSourceMuxer> Ptr;
 
-    class Listener{
+    class Listener {
     public:
         Listener() = default;
         virtual ~Listener() = default;
@@ -165,6 +126,7 @@ public:
     const std::string& getVhost() const;
     const std::string& getApp() const;
     const std::string& getStreamId() const;
+    std::string shortUrl() const;
 
 protected:
     /////////////////////////////////MediaSink override/////////////////////////////////
@@ -189,6 +151,7 @@ protected:
 
 private:
     bool _is_enable = false;
+    bool _create_in_poller = false;
     std::string _vhost;
     std::string _app;
     std::string _stream_id;
@@ -196,7 +159,6 @@ private:
     toolkit::Ticker _last_check;
     Stamp _stamp[2];
     std::weak_ptr<Listener> _track_listener;
-    std::function<std::string()> _get_origin_url;
 #if defined(ENABLE_RTPPROXY)
     std::unordered_map<std::string, RtpSender::Ptr> _rtp_sender;
 #endif //ENABLE_RTPPROXY

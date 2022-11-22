@@ -43,7 +43,7 @@
 
 ## 功能清单
 ### 功能一览
-<img width="800" alt="功能一览" src="https://user-images.githubusercontent.com/11495632/114176523-d50fce80-996d-11eb-81f8-0a2e2715ba7b.png">
+<img width="800" alt="功能一览" src="https://user-images.githubusercontent.com/11495632/190864440-91c45f8f-480f-43db-8110-5bb44e6300ff.png">
 
 - RTSP[S]
   - RTSP[S] 服务器，支持RTMP/MP4/HLS转RTSP[S],支持亚马逊echo show这样的设备
@@ -92,10 +92,11 @@
   - 支持http文件访问鉴权
 
 - GB28181与RTP推流
-  - 支持UDP/TCP国标RTP(PS或TS)推流服务器，可以转换成RTSP/RTMP/HLS等协议
-  - 支持RTSP/RTMP/HLS转国标推流客户端，支持TCP/UDP模式，提供相应restful api
+  - 支持UDP/TCP RTP(PS/TS/ES)推流服务器，可以转换成RTSP/RTMP/HLS等协议
+  - 支持RTSP/RTMP/HLS等协议转rtp推流客户端，支持TCP/UDP模式，提供相应restful api，支持主动被动方式。
   - 支持H264/H265/AAC/G711/OPUS编码
   - 支持海康ehome推流
+  - 支持GB28181主动拉流模式
 
 - MP4点播与录制
   - 支持录制为FLV/HLS/MP4
@@ -114,6 +115,7 @@
   - 支持rtp扩展解析
   - 支持GOP缓冲，webrtc播放秒开
   - 支持datachannel
+  - 支持webrtc over tcp模式
 - [SRT支持](./srt/srt.md)
 - 其他
   - 支持丰富的restful api以及web hook事件 

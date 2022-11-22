@@ -312,6 +312,14 @@ static inline string getPusherKey(const string &schema, const string &vhost, con
     return schema + "/" + vhost + "/" + app + "/" + stream + "/" + MD5(dst_url).hexdigest();
 }
 
+static void fillSockInfo(Value& val, SockInfo* info) {
+    val["peer_ip"] = info->get_peer_ip();
+    val["peer_port"] = info->get_peer_port();
+    val["local_port"] = info->get_local_port();
+    val["local_ip"] = info->get_local_ip();
+    val["identifier"] = info->getIdentifier();
+}
+
 Value makeMediaSourceJson(MediaSource &media){
     Value item;
     item["schema"] = media.getSchema();
@@ -330,11 +338,7 @@ Value makeMediaSourceJson(MediaSource &media){
     item["isRecordingHLS"] = media.isRecording(Recorder::type_hls);
     auto originSock = media.getOriginSock();
     if (originSock) {
-        item["originSock"]["local_ip"] = originSock->get_local_ip();
-        item["originSock"]["local_port"] = originSock->get_local_port();
-        item["originSock"]["peer_ip"] = originSock->get_peer_ip();
-        item["originSock"]["peer_port"] = originSock->get_peer_port();
-        item["originSock"]["identifier"] = originSock->getIdentifier();
+        fillSockInfo(item["originSock"], originSock.get());
     } else {
         item["originSock"] = Json::nullValue;
     }
@@ -383,7 +387,7 @@ Value makeMediaSourceJson(MediaSource &media){
 }
 
 #if defined(ENABLE_RTPPROXY)
-uint16_t openRtpServer(uint16_t local_port, const string &stream_id, bool enable_tcp, const string &local_ip, bool re_use_port, uint32_t ssrc) {
+uint16_t openRtpServer(uint16_t local_port, const string &stream_id, int tcp_mode, const string &local_ip, bool re_use_port, uint32_t ssrc) {
     lock_guard<recursive_mutex> lck(s_rtpServerMapMtx);
     if (s_rtpServerMap.find(stream_id) != s_rtpServerMap.end()) {
         //为了防止RtpProcess所有权限混乱的问题，不允许重复添加相同的stream_id
@@ -391,17 +395,27 @@ uint16_t openRtpServer(uint16_t local_port, const string &stream_id, bool enable
     }
 
     RtpServer::Ptr server = std::make_shared<RtpServer>();
-    server->start(local_port, stream_id, enable_tcp, local_ip.c_str(), re_use_port, ssrc);
+    server->start(local_port, stream_id, (RtpServer::TcpMode)tcp_mode, local_ip.c_str(), re_use_port, ssrc);
     server->setOnDetach([stream_id]() {
         //设置rtp超时移除事件
         lock_guard<recursive_mutex> lck(s_rtpServerMapMtx);
         s_rtpServerMap.erase(stream_id);
-        });
+    });
 
     //保存对象
     s_rtpServerMap.emplace(stream_id, server);
     //回复json
     return server->getPort();
+}
+
+void connectRtpServer(const string &stream_id, const string &dst_url, uint16_t dst_port, const function<void(const SockException &ex)> &cb) {
+    lock_guard<recursive_mutex> lck(s_rtpServerMapMtx);
+    auto it = s_rtpServerMap.find(stream_id);
+    if (it == s_rtpServerMap.end()) {
+        cb(SockException(Err_other, "未找到rtp服务"));
+        return;
+    }
+    it->second->connectToServer(dst_url, dst_port, cb);
 }
 
 bool closeRtpServer(const string &stream_id) {
@@ -772,9 +786,7 @@ void installWebApi() {
             [](std::shared_ptr<void> &&info) -> std::shared_ptr<void> {
                 auto obj = std::make_shared<Value>();
                 auto session = static_pointer_cast<Session>(info);
-                (*obj)["peer_ip"] = session->get_peer_ip();
-                (*obj)["peer_port"] = session->get_peer_port();
-                (*obj)["id"] = session->getIdentifier();
+                fillSockInfo(*obj, session.get());
                 (*obj)["typeid"] = toolkit::demangle(typeid(*session).name());
                 return obj;
             });
@@ -842,7 +854,7 @@ void installWebApi() {
         val["count_closed"] = count_closed;
     });
 
-    //获取所有TcpSession列表信息
+    //获取所有Session列表信息
     //可以根据本地端口和远端ip来筛选
     //测试url(筛选某端口下的tcp会话) http://127.0.0.1/index/api/getAllSession?local_port=1935
     api_regist("/index/api/getAllSession",[](API_ARGS_MAP){
@@ -858,10 +870,7 @@ void installWebApi() {
             if(!peer_ip.empty() && peer_ip != session->get_peer_ip()){
                 return;
             }
-            jsession["peer_ip"] = session->get_peer_ip();
-            jsession["peer_port"] = session->get_peer_port();
-            jsession["local_ip"] = session->get_local_ip();
-            jsession["local_port"] = session->get_local_port();
+            fillSockInfo(jsession, session.get());
             jsession["id"] = id;
             jsession["typeid"] = toolkit::demangle(typeid(*session).name());
             val["data"].append(jsession);
@@ -1002,20 +1011,7 @@ void installWebApi() {
         CHECK_SECRET();
         CHECK_ARGS("vhost","app","stream","url");
 
-        ProtocolOption option;
-        getArgsValue(allArgs, "enable_hls", option.enable_hls);
-        getArgsValue(allArgs, "enable_mp4", option.enable_mp4);
-        getArgsValue(allArgs, "mp4_as_player", option.mp4_as_player);
-        getArgsValue(allArgs, "enable_rtsp", option.enable_rtsp);
-        getArgsValue(allArgs, "enable_rtmp", option.enable_rtmp);
-        getArgsValue(allArgs, "enable_ts", option.enable_ts);
-        getArgsValue(allArgs, "enable_fmp4", option.enable_fmp4);
-        getArgsValue(allArgs, "enable_audio", option.enable_audio);
-        getArgsValue(allArgs, "add_mute_audio", option.add_mute_audio);
-        getArgsValue(allArgs, "mp4_save_path", option.mp4_save_path);
-        getArgsValue(allArgs, "mp4_max_second", option.mp4_max_second);
-        getArgsValue(allArgs, "hls_save_path", option.hls_save_path);
-        getArgsValue(allArgs, "modify_stamp", option.modify_stamp);
+        ProtocolOption option(allArgs);
 
         addStreamProxy(allArgs["vhost"],
                        allArgs["app"],
@@ -1127,23 +1123,39 @@ void installWebApi() {
             return;
         }
         val["exist"] = true;
-        val["peer_ip"] = process->get_peer_ip();
-        val["peer_port"] = process->get_peer_port();
-        val["local_port"] = process->get_local_port();
-        val["local_ip"] = process->get_local_ip();
+        fillSockInfo(val, process.get());
     });
 
     api_regist("/index/api/openRtpServer",[](API_ARGS_MAP){
         CHECK_SECRET();
-        CHECK_ARGS("port", "enable_tcp", "stream_id");
+        CHECK_ARGS("port", "stream_id");
         auto stream_id = allArgs["stream_id"];
-        auto port = openRtpServer(allArgs["port"], stream_id, allArgs["enable_tcp"].as<bool>(), "::",
-                      allArgs["re_use_port"].as<bool>(), allArgs["ssrc"].as<uint32_t>());
-        if(port == 0) {
+        auto tcp_mode = allArgs["tcp_mode"].as<int>();
+        if (allArgs["enable_tcp"].as<int>() && !tcp_mode) {
+            //兼容老版本请求，新版本去除enable_tcp参数并新增tcp_mode参数
+            tcp_mode = 1;
+        }
+        auto port = openRtpServer(allArgs["port"], stream_id, tcp_mode, "::", allArgs["re_use_port"].as<bool>(),
+                                  allArgs["ssrc"].as<uint32_t>());
+        if (port == 0) {
             throw InvalidArgsException("该stream_id已存在");
         }
         //回复json
         val["port"] = port;
+    });
+
+    api_regist("/index/api/connectRtpServer", [](API_ARGS_MAP_ASYNC) {
+        CHECK_SECRET();
+        CHECK_ARGS("stream_id", "dst_url", "dst_port");
+        connectRtpServer(
+            allArgs["stream_id"], allArgs["dst_url"], allArgs["dst_port"],
+            [val, headerOut, invoker](const SockException &ex) mutable {
+                if (ex) {
+                    val["code"] = API::OtherFailed;
+                    val["msg"] = ex.what();
+                }
+                invoker(200, headerOut, val.toStyledString());
+            });
     });
 
     api_regist("/index/api/closeRtpServer",[](API_ARGS_MAP){
@@ -1567,9 +1579,9 @@ void installWebApi() {
         auto offer = allArgs.getArgs();
         CHECK(!offer.empty(), "http body(webrtc offer sdp) is empty");
 
-        WebRtcPluginManager::Instance().getAnswerSdp(
-            *(static_cast<Session *>(&sender)), type, offer, WebRtcArgsImp(allArgs, sender.getIdentifier()),
-            [invoker, val, offer, headerOut](const WebRtcInterface &exchanger) mutable {
+        WebRtcPluginManager::Instance().getAnswerSdp(*(static_cast<Session *>(&sender)), type,
+                                                     WebRtcArgsImp(allArgs, sender.getIdentifier()),
+                                                     [invoker, val, offer, headerOut](const WebRtcInterface &exchanger) mutable {
             //设置返回类型
             headerOut["Content-Type"] = HttpFileManager::getContentType(".json");
             //设置跨域
@@ -1605,9 +1617,9 @@ void installWebApi() {
     api_regist("/index/hook/on_publish",[](API_ARGS_JSON){
         //开始推流事件
         //转换hls
-        val["enableHls"] = true;
+        val["enable_hls"] = true;
         //不录制mp4
-        val["enableMP4"] = false;
+        val["enable_mp4"] = false;
     });
 
     api_regist("/index/hook/on_play",[](API_ARGS_JSON){
@@ -1749,6 +1761,11 @@ void installWebApi() {
 
     api_regist("/index/hook/on_server_keepalive",[](API_ARGS_JSON){
         //心跳hook
+    });
+
+    api_regist("/index/hook/on_rtp_server_timeout",[](API_ARGS_JSON){
+        //rtp server 超时
+        TraceL <<allArgs.getArgs().toStyledString();
     });
 }
 

@@ -37,7 +37,13 @@ static std::shared_ptr<RtpServer> rtpServer;
 
 #ifdef ENABLE_WEBRTC
 #include "../webrtc/WebRtcSession.h"
-static std::shared_ptr<UdpServer> rtcServer;
+static std::shared_ptr<UdpServer> rtcServer_udp;
+static std::shared_ptr<TcpServer> rtcServer_tcp;
+#endif
+
+#if defined(ENABLE_SRT)
+#include "../srt/SrtSession.hpp"
+static std::shared_ptr<UdpServer> srtServer;
 #endif
 
 //////////////////////////environment init///////////////////////////
@@ -62,8 +68,16 @@ API_EXPORT void API_CALL mk_stop_all_server(){
     CLEAR_ARR(rtsp_server);
     CLEAR_ARR(rtmp_server);
     CLEAR_ARR(http_server);
+    shell_server = nullptr;
 #ifdef ENABLE_RTPPROXY
     rtpServer = nullptr;
+#endif
+#ifdef ENABLE_WEBRTC
+    rtcServer_udp = nullptr;
+    rtcServer_tcp = nullptr;
+#endif
+#ifdef ENABLE_SRT
+    srtServer = nullptr;
 #endif
     stopAllTcpServer();
 }
@@ -160,13 +174,13 @@ API_EXPORT uint16_t API_CALL mk_http_server_start(uint16_t port, int ssl) {
     try {
         http_server[ssl] = std::make_shared<TcpServer>();
         if(ssl){
-            http_server[ssl]->start<TcpSessionWithSSL<HttpSession> >(port);
+            http_server[ssl]->start<SessionWithSSL<HttpSession> >(port);
         } else{
             http_server[ssl]->start<HttpSession>(port);
         }
         return http_server[ssl]->getPort();
     } catch (std::exception &ex) {
-        http_server[ssl].reset();
+        http_server[ssl] = nullptr;;
         WarnL << ex.what();
         return 0;
     }
@@ -177,13 +191,13 @@ API_EXPORT uint16_t API_CALL mk_rtsp_server_start(uint16_t port, int ssl) {
     try {
         rtsp_server[ssl] = std::make_shared<TcpServer>();
         if(ssl){
-            rtsp_server[ssl]->start<TcpSessionWithSSL<RtspSession> >(port);
+            rtsp_server[ssl]->start<SessionWithSSL<RtspSession> >(port);
         }else{
             rtsp_server[ssl]->start<RtspSession>(port);
         }
         return rtsp_server[ssl]->getPort();
     } catch (std::exception &ex) {
-        rtsp_server[ssl].reset();
+        rtsp_server[ssl] = nullptr;;
         WarnL << ex.what();
         return 0;
     }
@@ -194,13 +208,13 @@ API_EXPORT uint16_t API_CALL mk_rtmp_server_start(uint16_t port, int ssl) {
     try {
         rtmp_server[ssl] = std::make_shared<TcpServer>();
         if(ssl){
-            rtmp_server[ssl]->start<TcpSessionWithSSL<RtmpSession> >(port);
+            rtmp_server[ssl]->start<SessionWithSSL<RtmpSession> >(port);
         }else{
             rtmp_server[ssl]->start<RtmpSession>(port);
         }
         return rtmp_server[ssl]->getPort();
     } catch (std::exception &ex) {
-        rtmp_server[ssl].reset();
+        rtmp_server[ssl] = nullptr;;
         WarnL << ex.what();
         return 0;
     }
@@ -214,7 +228,7 @@ API_EXPORT uint16_t API_CALL mk_rtp_server_start(uint16_t port){
         rtpServer->start(port);
         return rtpServer->getPort();
     } catch (std::exception &ex) {
-        rtpServer.reset();
+        rtpServer = nullptr;;
         WarnL << ex.what();
         return 0;
     }
@@ -227,9 +241,9 @@ API_EXPORT uint16_t API_CALL mk_rtp_server_start(uint16_t port){
 API_EXPORT uint16_t API_CALL mk_rtc_server_start(uint16_t port) {
 #ifdef ENABLE_WEBRTC
     try {
-        //创建rtc服务器
-        rtcServer = std::make_shared<UdpServer>();
-        rtcServer->setOnCreateSocket([](const EventPoller::Ptr &poller, const Buffer::Ptr &buf, struct sockaddr *, int) {
+        //创建rtc udp服务器
+        rtcServer_udp = std::make_shared<UdpServer>();
+        rtcServer_udp->setOnCreateSocket([](const EventPoller::Ptr &poller, const Buffer::Ptr &buf, struct sockaddr *, int) {
             if (!buf) {
                 return Socket::createSocket(poller, false);
             }
@@ -240,11 +254,82 @@ API_EXPORT uint16_t API_CALL mk_rtc_server_start(uint16_t port) {
             }
             return Socket::createSocket(new_poller, false);
         });
-        rtcServer->start<WebRtcSession>(port);
-        return rtcServer->getPort();
+        rtcServer_udp->start<WebRtcSession>(port);
+        //创建rtc tcp服务器
+        rtcServer_tcp = std::make_shared<TcpServer>();
+        rtcServer_tcp->start<WebRtcSession>(rtcServer_udp->getPort());
+        return rtcServer_udp->getPort();
 
     } catch (std::exception &ex) {
-        rtcServer.reset();
+        rtcServer_udp = nullptr;
+        rtcServer_tcp = nullptr;
+        WarnL << ex.what();
+        return 0;
+    }
+#else
+    WarnL << "未启用webrtc功能, 编译时请开启ENABLE_WEBRTC";
+    return 0;
+#endif
+}
+
+#ifdef ENABLE_WEBRTC
+class WebRtcArgsUrl : public mediakit::WebRtcArgs {
+public:
+    WebRtcArgsUrl(std::string url) { _url = std::move(url); }
+    ~WebRtcArgsUrl() = default;
+
+    toolkit::variant operator[](const std::string &key) const override {
+        if (key == "url") {
+            return _url;
+        }
+        return "";
+    }
+
+private:
+    std::string _url;
+};
+#endif
+
+API_EXPORT void API_CALL mk_webrtc_get_answer_sdp(void *user_data, on_mk_webrtc_get_answer_sdp cb, const char *type,
+                                                  const char *offer, const char *url) {
+#ifdef ENABLE_WEBRTC
+    assert(type && offer && url && cb);
+    auto session = std::make_shared<HttpSession>(Socket::createSocket());
+    std::string offer_str = offer;
+    WebRtcPluginManager::Instance().getAnswerSdp(*session, type, WebRtcArgsUrl(url),
+                                                 [offer_str, session, user_data, cb](const WebRtcInterface &exchanger) mutable {
+        try {
+            auto sdp_answer = const_cast<WebRtcInterface &>(exchanger).getAnswerSdp(offer_str);
+            cb(user_data, sdp_answer.data(), nullptr);
+        } catch (std::exception &ex) {
+            cb(user_data, nullptr, ex.what());
+        }
+    });
+#else
+    WarnL << "未启用webrtc功能, 编译时请开启ENABLE_WEBRTC";
+#endif
+}
+
+API_EXPORT uint16_t API_CALL mk_srt_server_start(uint16_t port) {
+#ifdef ENABLE_SRT
+    try {
+        srtServer = std::make_shared<UdpServer>();
+        srtServer->setOnCreateSocket([](const EventPoller::Ptr &poller, const Buffer::Ptr &buf, struct sockaddr *, int) {
+            if (!buf) {
+                return Socket::createSocket(poller, false);
+            }
+            auto new_poller = SRT::SrtSession::queryPoller(buf);
+            if (!new_poller) {
+                //握手第一阶段
+                return Socket::createSocket(poller, false);
+            }
+            return Socket::createSocket(new_poller, false);
+        });
+        srtServer->start<SRT::SrtSession>(port);
+        return srtServer->getPort();
+
+    } catch (std::exception &ex) {
+        srtServer = nullptr;;
         WarnL << ex.what();
         return 0;
     }
@@ -260,7 +345,7 @@ API_EXPORT uint16_t API_CALL mk_shell_server_start(uint16_t port){
         shell_server->start<ShellSession>(port);
         return shell_server->getPort();
     } catch (std::exception &ex) {
-        shell_server.reset();
+        shell_server = nullptr;;
         WarnL << ex.what();
         return 0;
     }

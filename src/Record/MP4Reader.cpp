@@ -24,7 +24,7 @@ MP4Reader::MP4Reader(const string &vhost, const string &app, const string &strea
     _poller = WorkThreadPool::Instance().getPoller();
     _file_path = file_path;
     if (_file_path.empty()) {
-        GET_CONFIG(string, recordPath, Record::kFilePath);
+        GET_CONFIG(string, recordPath, Protocol::kMP4SavePath);
         GET_CONFIG(bool, enableVhost, General::kEnableVhost);
         if (enableVhost) {
             _file_path = vhost + "/" + app + "/" + stream_id;
@@ -111,9 +111,10 @@ void MP4Reader::startReadMP4(uint64_t sample_ms, bool ref_self, bool file_repeat
     GET_CONFIG(uint32_t, sampleMS, Record::kSampleMS);
     auto strong_self = shared_from_this();
     if (_muxer) {
-        _muxer->setMediaListener(strong_self);
         //一直读到所有track就绪为止
-        while (!_muxer->isAllTrackReady() && readNextSample()) {}
+        while (!_muxer->isAllTrackReady() && readNextSample());
+        //注册后再切换OwnerPoller
+        _muxer->setMediaListener(strong_self);
     }
 
     auto timer_sec = (sample_ms ? sample_ms : sampleMS) / 1000.0f;
@@ -230,12 +231,9 @@ bool MP4Reader::seekTo(uint32_t stamp_seek) {
     return false;
 }
 
-bool MP4Reader::close(MediaSource &sender, bool force) {
-    if (!_muxer || (!force && _muxer->totalReaderCount())) {
-        return false;
-    }
-    _timer.reset();
-    WarnL << sender.getSchema() << "/" << sender.getVhost() << "/" << sender.getApp() << "/" << sender.getId() << " " << force;
+bool MP4Reader::close(MediaSource &sender) {
+    _timer = nullptr;
+    WarnL << "close media: " << sender.getUrl();
     return true;
 }
 

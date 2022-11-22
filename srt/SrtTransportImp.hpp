@@ -37,6 +37,7 @@ protected:
     ///////SrtTransport override///////
     int getLatencyMul() override;
     int getPktBufSize() override;
+    float getTimeOutSec() override;
     void onSRTData(DataPacket::Ptr pkt) override;
     void onShutdown(const SockException &ex) override;
     void onHandShakeFinished(std::string &streamid, struct sockaddr_storage *addr) override;
@@ -50,7 +51,7 @@ protected:
 
     ///////MediaSourceEvent override///////
     // 关闭
-    bool close(mediakit::MediaSource &sender, bool force) override;
+    bool close(mediakit::MediaSource &sender) override;
     // 获取媒体源类型
     mediakit::MediaOriginType getOriginType(mediakit::MediaSource &sender) const override;
     // 获取媒体源url或者文件路径

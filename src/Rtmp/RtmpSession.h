@@ -20,12 +20,12 @@
 #include "RtmpMediaSourceImp.h"
 #include "Util/util.h"
 #include "Util/TimeTicker.h"
-#include "Network/TcpSession.h"
+#include "Network/Session.h"
 #include "Common/Stamp.h"
 
 namespace mediakit {
 
-class RtmpSession : public toolkit::TcpSession, public RtmpProtocol, public MediaSourceEvent {
+class RtmpSession : public toolkit::Session, public RtmpProtocol, public MediaSourceEvent {
 public:
     using Ptr = std::shared_ptr<RtmpSession>;
 
@@ -71,7 +71,7 @@ private:
 
     ///////MediaSourceEvent override///////
     // 关闭
-    bool close(MediaSource &sender, bool force) override;
+    bool close(MediaSource &sender) override;
     // 播放总人数
     int totalReaderCount(MediaSource &sender) override;
     // 获取媒体源类型
@@ -80,6 +80,8 @@ private:
     std::string getOriginUrl(MediaSource &sender) const override;
     // 获取媒体源客户端相关信息
     std::shared_ptr<SockInfo> getOriginSock(MediaSource &sender) const override;
+    // 由于支持断连续推，存在OwnerPoller变更的可能
+    toolkit::EventPoller::Ptr getOwnerPoller(MediaSource &sender) override;
 
     void setSocketFlags();
     std::string getStreamId(const std::string &str);
@@ -94,8 +96,6 @@ private:
     //消耗的总流量
     uint64_t _total_bytes = 0;
     std::string _tc_url;
-    //推流时间戳修整器
-    Stamp _stamp[2];
     //数据接收超时计时器
     toolkit::Ticker _ticker;
     MediaInfo _media_info;
@@ -109,7 +109,7 @@ private:
 /**
  * 支持ssl加密的rtmp服务器
  */
-using RtmpSessionWithSSL = toolkit::TcpSessionWithSSL<RtmpSession>;
+using RtmpSessionWithSSL = toolkit::SessionWithSSL<RtmpSession>;
 
 } /* namespace mediakit */
 #endif /* SRC_RTMP_RTMPSESSION_H_ */

@@ -37,7 +37,7 @@ bool MediaSink::addTrack(const Track::Ptr &track_in) {
     };
     _ticker.resetTime();
 
-    track->addDelegate(std::make_shared<FrameWriterInterfaceHelper>([this](const Frame::Ptr &frame) {
+    track->addDelegate([this](const Frame::Ptr &frame) {
         if (_all_track_ready) {
             return onTrackFrame(frame);
         }
@@ -52,7 +52,7 @@ bool MediaSink::addTrack(const Track::Ptr &track_in) {
         //还有Track未就绪，先缓存之
         frame_unread.emplace_back(Frame::getCacheAbleFrame(frame));
         return true;
-    }));
+    });
     return true;
 }
 
@@ -223,7 +223,7 @@ static uint8_t s_mute_adts[] = {0xff, 0xf1, 0x6c, 0x40, 0x2d, 0x3f, 0xfc, 0x00, 
 
 #define MUTE_ADTS_DATA s_mute_adts
 #define MUTE_ADTS_DATA_LEN sizeof(s_mute_adts)
-#define MUTE_ADTS_DATA_MS 130
+#define MUTE_ADTS_DATA_MS 128
 
 bool MuteAudioMaker::inputFrame(const Frame::Ptr &frame) {
     if (frame->getTrackType() == TrackVideo) {
@@ -247,13 +247,13 @@ bool MediaSink::addMuteAudioTrack() {
     }
     auto audio = std::make_shared<AACTrack>(makeAacConfig(MUTE_ADTS_DATA, ADTS_HEADER_LEN));
     _track_map[audio->getTrackType()] = std::make_pair(audio, true);
-    audio->addDelegate(std::make_shared<FrameWriterInterfaceHelper>([this](const Frame::Ptr &frame) {
+    audio->addDelegate([this](const Frame::Ptr &frame) {
         return onTrackFrame(frame);
-    }));
+    });
     _mute_audio_maker = std::make_shared<MuteAudioMaker>();
-    _mute_audio_maker->addDelegate(std::make_shared<FrameWriterInterfaceHelper>([audio](const Frame::Ptr &frame) {
+    _mute_audio_maker->addDelegate([audio](const Frame::Ptr &frame) {
         return audio->inputFrame(frame);
-    }));
+    });
     onTrackReady(audio);
     TraceL << "mute aac track added";
     return true;

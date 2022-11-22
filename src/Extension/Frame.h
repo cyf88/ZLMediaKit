@@ -38,7 +38,7 @@ typedef enum {
     XX(CodecL16,   TrackAudio, 6, "L16", PSI_STREAM_RESERVED)       \
     XX(CodecVP8,   TrackVideo, 7, "VP8", PSI_STREAM_VP8)            \
     XX(CodecVP9,   TrackVideo, 8, "VP9", PSI_STREAM_VP9)            \
-    XX(CodecAV1,   TrackVideo, 9, "AV1X", PSI_STREAM_AV1)
+    XX(CodecAV1,   TrackVideo, 9, "AV1", PSI_STREAM_AV1)
 
 typedef enum {
     CodecInvalid = -1,
@@ -271,29 +271,11 @@ public:
      * 写入帧数据
      */
     virtual bool inputFrame(const Frame::Ptr &frame) = 0;
-};
-
-/**
- * 写帧接口转function，辅助类
- */
-class FrameWriterInterfaceHelper : public FrameWriterInterface {
-public:
-    typedef std::shared_ptr<FrameWriterInterfaceHelper> Ptr;
-    typedef std::function<bool(const Frame::Ptr &frame)> onWriteFrame;
 
     /**
-     * inputFrame后触发onWriteFrame回调
+     * 刷新输出所有frame缓存
      */
-    FrameWriterInterfaceHelper(const onWriteFrame &cb) { _writeCallback = cb; }
-    virtual ~FrameWriterInterfaceHelper() = default;
-
-    /**
-     * 写入帧数据
-     */
-    bool inputFrame(const Frame::Ptr &frame) override { return _writeCallback(frame); }
-
-private:
-    onWriteFrame _writeCallback;
+    virtual void flush() {};
 };
 
 /**
@@ -308,10 +290,12 @@ public:
     /**
      * 添加代理
      */
-    void addDelegate(const FrameWriterInterface::Ptr &delegate) {
+    FrameWriterInterface* addDelegate(FrameWriterInterface::Ptr delegate) {
         std::lock_guard<std::mutex> lck(_mtx);
-        _delegates.emplace(delegate.get(), delegate);
+        return _delegates.emplace(delegate.get(), std::move(delegate)).first->second.get();
     }
+
+    FrameWriterInterface* addDelegate(std::function<bool(const Frame::Ptr &frame)> cb);
 
     /**
      * 删除代理
@@ -542,8 +526,13 @@ public:
     FrameMerger(int type);
     ~FrameMerger() = default;
 
+    /**
+     * 刷新输出缓冲，注意此时会调用FrameMerger::inputFrame传入的onOutput回调
+     * 请注意回调捕获参数此时是否有效
+     */
+    void flush();
     void clear();
-    bool inputFrame(const Frame::Ptr &frame, const onOutput &cb, toolkit::BufferLikeString *buffer = nullptr);
+    bool inputFrame(const Frame::Ptr &frame, onOutput cb, toolkit::BufferLikeString *buffer = nullptr);
 
 private:
     bool willFlush(const Frame::Ptr &frame) const;
@@ -552,6 +541,7 @@ private:
 private:
     int _type;
     bool _have_decode_able_frame = false;
+    onOutput _cb;
     toolkit::List<Frame::Ptr> _frame_cache;
 };
 

@@ -23,7 +23,7 @@ using namespace toolkit;
 
 namespace mediakit {
 
-HttpSession::HttpSession(const Socket::Ptr &pSock) : TcpSession(pSock) {
+HttpSession::HttpSession(const Socket::Ptr &pSock) : Session(pSock) {
     TraceP(this);
     GET_CONFIG(uint32_t,keep_alive_sec,Http::kKeepAliveSecond);
     pSock->setSendTimeOutSecond(keep_alive_sec);
@@ -103,9 +103,7 @@ void HttpSession::onError(const SockException& err) {
         //flv/ts播放器
         uint64_t duration = _ticker.createdTime() / 1000;
         WarnP(this) << "FLV/TS/FMP4播放器("
-                    << _mediaInfo._vhost << "/"
-                    << _mediaInfo._app << "/"
-                    << _mediaInfo._streamid
+                    << _mediaInfo.shortUrl()
                     << ")断开:" << err.what()
                     << ",耗时(s):" << duration;
 
@@ -442,7 +440,7 @@ class AsyncSenderData {
 public:
     friend class AsyncSender;
     typedef std::shared_ptr<AsyncSenderData> Ptr;
-    AsyncSenderData(const TcpSession::Ptr &session, const HttpBody::Ptr &body, bool close_when_complete) {
+    AsyncSenderData(const Session::Ptr &session, const HttpBody::Ptr &body, bool close_when_complete) {
         _session = dynamic_pointer_cast<HttpSession>(session);
         _body = body;
         _close_when_complete = close_when_complete;
@@ -674,7 +672,10 @@ bool HttpSession::emitHttpEvent(bool doInvoke){
 
 std::string HttpSession::get_peer_ip() {
     GET_CONFIG(string, forwarded_ip_header, Http::kForwardedIpHeader);
-    return forwarded_ip_header.empty() ? TcpSession::get_peer_ip() : _parser.getHeader()[forwarded_ip_header];
+    if(!forwarded_ip_header.empty() && !_parser.getHeader()[forwarded_ip_header].empty()){
+        return _parser.getHeader()[forwarded_ip_header];
+    }
+    return Session::get_peer_ip();
 }
 
 void HttpSession::Handle_Req_POST(ssize_t &content_len) {

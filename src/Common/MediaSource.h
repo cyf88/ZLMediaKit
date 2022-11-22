@@ -19,19 +19,14 @@
 #include <unordered_map>
 #include "Common/config.h"
 #include "Common/Parser.h"
-#include "Util/logger.h"
-#include "Util/TimeTicker.h"
-#include "Util/NoticeCenter.h"
 #include "Util/List.h"
 #include "Network/Socket.h"
-#include "Rtsp/Rtsp.h"
-#include "Rtmp/Rtmp.h"
 #include "Extension/Track.h"
 #include "Record/Recorder.h"
 
-namespace toolkit{
-    class Session;
-}// namespace toolkit
+namespace toolkit {
+class Session;
+} // namespace toolkit
 
 namespace mediakit {
 
@@ -62,8 +57,8 @@ public:
         ~NotImplemented() override = default;
     };
 
-    MediaSourceEvent(){};
-    virtual ~MediaSourceEvent(){};
+    MediaSourceEvent() = default;
+    virtual ~MediaSourceEvent() = default;
 
     // 获取媒体源类型
     virtual MediaOriginType getOriginType(MediaSource &sender) const { return MediaOriginType::unknown; }
@@ -79,13 +74,13 @@ public:
     // 通知倍数
     virtual bool speed(MediaSource &sender, float speed) { return false; }
     // 通知其停止产生流
-    virtual bool close(MediaSource &sender, bool force) { return false; }
+    virtual bool close(MediaSource &sender) { return false; }
     // 获取观看总人数，此函数一般强制重载
     virtual int totalReaderCount(MediaSource &sender) { throw NotImplemented(toolkit::demangle(typeid(*this).name()) + "::totalReaderCount not implemented"); }
     // 通知观看人数变化
     virtual void onReaderChanged(MediaSource &sender, int size);
     //流注册或注销事件
-    virtual void onRegist(MediaSource &sender, bool regist) {};
+    virtual void onRegist(MediaSource &sender, bool regist) {}
     // 获取丢包率
     virtual float getLossRate(MediaSource &sender, TrackType type) { return -1; }
     // 获取所在线程, 此函数一般强制重载
@@ -95,7 +90,7 @@ public:
     // 开启或关闭录制
     virtual bool setupRecord(MediaSource &sender, Recorder::type type, bool start, const std::string &custom_path, size_t max_second) { return false; };
     // 获取录制状态
-    virtual bool isRecording(MediaSource &sender, Recorder::type type) { return false; };
+    virtual bool isRecording(MediaSource &sender, Recorder::type type) { return false; }
     // 获取所有track相关信息
     virtual std::vector<Track::Ptr> getMediaTracks(MediaSource &sender, bool trackReady = true) const { return std::vector<Track::Ptr>(); };
 
@@ -139,11 +134,96 @@ private:
     toolkit::Timer::Ptr _async_close_timer;
 };
 
-//该对象用于拦截感兴趣的MediaSourceEvent事件
-class MediaSourceEventInterceptor : public MediaSourceEvent{
+class ProtocolOption {
 public:
-    MediaSourceEventInterceptor(){}
-    ~MediaSourceEventInterceptor() override {}
+    ProtocolOption();
+
+    //时间戳修复这一路流标志位
+    bool modify_stamp;
+    //转协议是否开启音频
+    bool enable_audio;
+    //添加静音音频，在关闭音频时，此开关无效
+    bool add_mute_audio;
+    //断连续推延时，单位毫秒，默认采用配置文件
+    uint32_t continue_push_ms;
+
+    //是否开启转换为hls
+    bool enable_hls;
+    //是否开启MP4录制
+    bool enable_mp4;
+    //是否开启转换为rtsp/webrtc
+    bool enable_rtsp;
+    //是否开启转换为rtmp/flv
+    bool enable_rtmp;
+    //是否开启转换为http-ts/ws-ts
+    bool enable_ts;
+    //是否开启转换为http-fmp4/ws-fmp4
+    bool enable_fmp4;
+
+    // hls协议是否按需生成，如果hls.segNum配置为0(意味着hls录制)，那么hls将一直生成(不管此开关)
+    bool hls_demand;
+    // rtsp[s]协议是否按需生成
+    bool rtsp_demand;
+    // rtmp[s]、http[s]-flv、ws[s]-flv协议是否按需生成
+    bool rtmp_demand;
+    // http[s]-ts协议是否按需生成
+    bool ts_demand;
+    // http[s]-fmp4、ws[s]-fmp4协议是否按需生成
+    bool fmp4_demand;
+
+    //是否将mp4录制当做观看者
+    bool mp4_as_player;
+    //mp4切片大小，单位秒
+    size_t mp4_max_second;
+    //mp4录制保存路径
+    std::string mp4_save_path;
+
+    //hls录制保存路径
+    std::string hls_save_path;
+
+    template <typename MAP>
+    ProtocolOption(const MAP &allArgs) : ProtocolOption() {
+#define GET_OPT_VALUE(key) getArgsValue(allArgs, #key, key)
+        GET_OPT_VALUE(modify_stamp);
+        GET_OPT_VALUE(enable_audio);
+        GET_OPT_VALUE(add_mute_audio);
+        GET_OPT_VALUE(continue_push_ms);
+
+        GET_OPT_VALUE(enable_hls);
+        GET_OPT_VALUE(enable_mp4);
+        GET_OPT_VALUE(enable_rtsp);
+        GET_OPT_VALUE(enable_rtmp);
+        GET_OPT_VALUE(enable_ts);
+        GET_OPT_VALUE(enable_fmp4);
+
+        GET_OPT_VALUE(hls_demand);
+        GET_OPT_VALUE(rtsp_demand);
+        GET_OPT_VALUE(rtmp_demand);
+        GET_OPT_VALUE(ts_demand);
+        GET_OPT_VALUE(fmp4_demand);
+
+        GET_OPT_VALUE(mp4_max_second);
+        GET_OPT_VALUE(mp4_as_player);
+        GET_OPT_VALUE(mp4_save_path);
+
+        GET_OPT_VALUE(hls_save_path);
+    }
+
+private:
+    template <typename MAP, typename KEY, typename TYPE>
+    static void getArgsValue(const MAP &allArgs, const KEY &key, TYPE &value) {
+        auto val = ((MAP &)allArgs)[key];
+        if (!val.empty()) {
+            value = (TYPE)val;
+        }
+    }
+};
+
+//该对象用于拦截感兴趣的MediaSourceEvent事件
+class MediaSourceEventInterceptor : public MediaSourceEvent {
+public:
+    MediaSourceEventInterceptor() = default;
+    ~MediaSourceEventInterceptor() override = default;
 
     void setDelegate(const std::weak_ptr<MediaSourceEvent> &listener);
     std::shared_ptr<MediaSourceEvent> getDelegate() const;
@@ -155,7 +235,7 @@ public:
     bool seekTo(MediaSource &sender, uint32_t stamp) override;
     bool pause(MediaSource &sender,  bool pause) override;
     bool speed(MediaSource &sender, float speed) override;
-    bool close(MediaSource &sender, bool force) override;
+    bool close(MediaSource &sender) override;
     int totalReaderCount(MediaSource &sender) override;
     void onReaderChanged(MediaSource &sender, int size) override;
     void onRegist(MediaSource &sender, bool regist) override;
@@ -174,18 +254,20 @@ private:
 /**
  * 解析url获取媒体相关信息
  */
-class MediaInfo{
+class MediaInfo {
 public:
-    ~MediaInfo() {}
-    MediaInfo() {}
+    ~MediaInfo() = default;
+    MediaInfo() = default;
     MediaInfo(const std::string &url) { parse(url); }
     void parse(const std::string &url);
+    std::string shortUrl() const { return _vhost + "/" + _app + "/" + _streamid; }
+    std::string getUrl() const { return _schema + "://" + shortUrl(); }
 
 public:
+    uint16_t _port = 0;
     std::string _full_url;
     std::string _schema;
     std::string _host;
-    uint16_t _port = 0;
     std::string _vhost;
     std::string _app;
     std::string _streamid;
@@ -199,12 +281,8 @@ class MediaSource: public TrackSource, public std::enable_shared_from_this<Media
 public:
     static MediaSource& NullMediaSource();
     using Ptr = std::shared_ptr<MediaSource>;
-    using StreamMap = std::unordered_map<std::string/*stream_id*/, std::weak_ptr<MediaSource> >;
-    using AppStreamMap = std::unordered_map<std::string/*app*/, StreamMap>;
-    using VhostAppStreamMap = std::unordered_map<std::string/*vhost*/, AppStreamMap>;
-    using SchemaVhostAppStreamMap = std::unordered_map<std::string/*schema*/, VhostAppStreamMap>;
 
-    MediaSource(const std::string &schema, const std::string &vhost, const std::string &app, const std::string &stream_id) ;
+    MediaSource(const std::string &schema, const std::string &vhost, const std::string &app, const std::string &stream_id);
     virtual ~MediaSource();
 
     ////////////////获取MediaSource相关信息////////////////
@@ -217,6 +295,10 @@ public:
     const std::string& getApp() const;
     // 流id
     const std::string& getId() const;
+
+    std::string shortUrl() const { return _vhost + "/" + _app + "/" + _stream_id; }
+
+    std::string getUrl() const { return _schema + "://" + shortUrl(); }
 
     //获取对象所有权
     std::shared_ptr<void> getOwnership();
@@ -232,7 +314,7 @@ public:
     // 获取数据速率，单位bytes/s
     int getBytesSpeed(TrackType type = TrackInvalid);
     // 获取流创建GMT unix时间戳，单位秒
-    uint64_t getCreateStamp() const;
+    uint64_t getCreateStamp() const { return _create_stamp; }
     // 获取流上线时间，单位秒
     uint64_t getAliveSecond() const;
 
@@ -263,9 +345,9 @@ public:
 
     // 拖动进度条
     bool seekTo(uint32_t stamp);
-    //暂停
+    // 暂停
     bool pause(bool pause);
-    //倍数播放
+    // 倍数播放
     bool speed(float speed);
     // 关闭该流
     bool close(bool force);
@@ -288,8 +370,11 @@ public:
 
     // 同步查找流
     static Ptr find(const std::string &schema, const std::string &vhost, const std::string &app, const std::string &id, bool from_mp4 = false);
+    static Ptr find(const MediaInfo &info, bool from_mp4 = false) {
+        return find(info._schema, info._vhost, info._app, info._streamid, from_mp4);
+    }
 
-    // 忽略类型，同步查找流，可能返回rtmp/rtsp/hls类型
+    // 忽略schema，同步查找流，可能返回rtmp/rtsp/hls类型
     static Ptr find(const std::string &vhost, const std::string &app, const std::string &stream_id, bool from_mp4 = false);
 
     // 异步查找流
@@ -304,9 +389,9 @@ protected:
     void regist();
 
 private:
-    //媒体注销
+    // 媒体注销
     bool unregist();
-    //触发媒体事件
+    // 触发媒体事件
     void emitEvent(bool regist);
 
 protected:
@@ -322,11 +407,11 @@ private:
     std::string _stream_id;
     std::weak_ptr<MediaSourceEvent> _listener;
     toolkit::EventPoller::Ptr _default_poller;
-    //对象个数统计
+    // 对象个数统计
     toolkit::ObjectStatistic<MediaSource> _statistic;
 };
 
-///缓存刷新策略类
+/// 缓存刷新策略类
 class FlushPolicy {
 public:
     FlushPolicy() = default;
@@ -335,7 +420,8 @@ public:
     bool isFlushAble(bool is_video, bool is_key, uint64_t new_stamp, size_t cache_size);
 
 private:
-    uint64_t _last_stamp[2] = {0, 0};
+    // 音视频的最后时间戳
+    uint64_t _last_stamp[2] = { 0, 0 };
 };
 
 /// 合并写缓存模板
@@ -345,16 +431,14 @@ private:
 template<typename packet, typename policy = FlushPolicy, typename packet_list = toolkit::List<std::shared_ptr<packet> > >
 class PacketCache {
 public:
-    PacketCache(){
-        _cache = std::make_shared<packet_list>();
-    }
+    PacketCache() { _cache = std::make_shared<packet_list>(); }
 
     virtual ~PacketCache() = default;
 
     void inputPacket(uint64_t stamp, bool is_video, std::shared_ptr<packet> pkt, bool key_pos) {
-        bool flush = flushImmediatelyWhenCloseMerge();
-        if (!flush && _policy.isFlushAble(is_video, key_pos, stamp, _cache->size())) {
-            flushAll();
+        bool flag = flushImmediatelyWhenCloseMerge();
+        if (!flag && _policy.isFlushAble(is_video, key_pos, stamp, _cache->size())) {
+            flush();
         }
 
         //追加数据到最后
@@ -363,9 +447,18 @@ public:
             _key_pos = key_pos;
         }
 
-        if (flush) {
-            flushAll();
+        if (flag) {
+            flush();
         }
+    }
+
+    void flush() {
+        if (_cache->empty()) {
+            return;
+        }
+        onFlush(std::move(_cache), _key_pos);
+        _cache = std::make_shared<packet_list>();
+        _key_pos = false;
     }
 
     virtual void clearCache() {
@@ -375,22 +468,19 @@ public:
     virtual void onFlush(std::shared_ptr<packet_list>, bool key_pos) = 0;
 
 private:
-    void flushAll() {
-        if (_cache->empty()) {
-            return;
-        }
-        onFlush(std::move(_cache), _key_pos);
-        _cache = std::make_shared<packet_list>();
-        _key_pos = false;
-    }
-
     bool flushImmediatelyWhenCloseMerge() {
-        //一般的协议关闭合并写时，立即刷新缓存，这样可以减少一帧的延时，但是rtp例外
-        //因为rtp的包很小，一个RtpPacket包中也不是完整的一帧图像，所以在关闭合并写时，
-        //还是有必要缓冲一帧的rtp(也就是时间戳相同的rtp)再输出，这样虽然会增加一帧的延时
-        //但是却对性能提升很大，这样做还是比较划算的
+        // 一般的协议关闭合并写时，立即刷新缓存，这样可以减少一帧的延时，但是rtp例外
+        // 因为rtp的包很小，一个RtpPacket包中也不是完整的一帧图像，所以在关闭合并写时，
+        // 还是有必要缓冲一帧的rtp(也就是时间戳相同的rtp)再输出，这样虽然会增加一帧的延时
+        // 但是却对性能提升很大，这样做还是比较划算的
 
         GET_CONFIG(int, mergeWriteMS, General::kMergeWriteMS);
+
+        GET_CONFIG(int, rtspLowLatency, Rtsp::kLowLatency);
+        if (std::is_same<packet, RtpPacket>::value && rtspLowLatency) {
+            return true;
+        }
+
         return std::is_same<packet, RtpPacket>::value ? false : (mergeWriteMS <= 0);
     }
 

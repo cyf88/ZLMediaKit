@@ -11,7 +11,8 @@
 #include "WebRtcPlayer.h"
 
 using namespace std;
-using namespace mediakit;
+
+namespace mediakit {
 
 WebRtcPlayer::Ptr WebRtcPlayer::create(const EventPoller::Ptr &poller,
                                        const RtspMediaSource::Ptr &src,
@@ -72,9 +73,7 @@ void WebRtcPlayer::onDestory() {
     GET_CONFIG(uint32_t, iFlowThreshold, General::kFlowThreshold);
     if (_reader && getSession()) {
         WarnL << "RTC播放器("
-              << _media_info._vhost << "/"
-              << _media_info._app << "/"
-              << _media_info._streamid
+              << _media_info.shortUrl()
               << ")结束播放,耗时(s):" << duration;
         if (bytes_usage >= iFlowThreshold * 1024) {
             NoticeCenter::Instance().emitEvent(Broadcast::kBroadcastFlowReport, _media_info, bytes_usage, duration,
@@ -90,3 +89,5 @@ void WebRtcPlayer::onRtcConfigure(RtcConfigure &configure) const {
     configure.audio.direction = configure.video.direction = RtpDirection::sendonly;
     configure.setPlayRtspInfo(_play_src->getSdp());
 }
+
+}// namespace mediakit

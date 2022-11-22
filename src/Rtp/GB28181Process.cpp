@@ -59,10 +59,14 @@ GB28181Process::GB28181Process(const MediaInfo &media_info, MediaSinkInterface *
     _interface = sink;
 }
 
-GB28181Process::~GB28181Process() {}
-
 void GB28181Process::onRtpSorted(RtpPacket::Ptr rtp) {
     _rtp_decoder[rtp->getHeader()->pt]->inputRtp(rtp, false);
+}
+
+void GB28181Process::flush() {
+    if (_decoder) {
+        _decoder->flush();
+    }
 }
 
 bool GB28181Process::inputRtp(bool, const char *data, size_t data_len) {
@@ -132,10 +136,10 @@ bool GB28181Process::inputRtp(bool, const char *data, size_t data_len) {
             }
         }
         // 设置frame回调
-        _rtp_decoder[pt]->addDelegate(std::make_shared<FrameWriterInterfaceHelper>([this](const Frame::Ptr &frame) {
+        _rtp_decoder[pt]->addDelegate([this](const Frame::Ptr &frame) {
             onRtpDecode(frame);
             return true;
-        }));
+        });
     }
 
     return ref->inputRtp(TrackVideo, (unsigned char *)data, data_len);

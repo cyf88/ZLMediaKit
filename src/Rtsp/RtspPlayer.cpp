@@ -197,13 +197,24 @@ void RtspPlayer::handleResDESCRIBE(const Parser& parser) {
         _content_base.pop_back();
     }
 
-    SdpParser sdpParser(parser.Content());
     //解析sdp
-    _sdp_track = sdpParser.getAvailableTrack();
+    SdpParser sdpParser(parser.Content());
+
+    string sdp;
+    auto play_track = (TrackType)((int)(*this)[Client::kPlayTrack] - 1);
+    if (play_track != TrackInvalid) {
+        auto track = sdpParser.getTrack(play_track);
+        _sdp_track.emplace_back(track);
+        sdp = track->toString();
+    } else {
+        _sdp_track = sdpParser.getAvailableTrack();
+        sdp = sdpParser.toString();
+    }
+
     if (_sdp_track.empty()) {
         throw std::runtime_error("无有效的Sdp Track");
     }
-    if (!onCheckSDP(sdpParser.toString())) {
+    if (!onCheckSDP(sdp)) {
         throw std::runtime_error("onCheckSDP faied");
     }
     _rtcp_context.clear();
@@ -569,16 +580,16 @@ void RtspPlayer::sendRtspRequest(const string &cmd, const string &url, const std
 
 void RtspPlayer::sendRtspRequest(const string &cmd, const string &url,const StrCaseMap &header_const) {
     auto header = header_const;
-    header.emplace("CSeq",StrPrinter << _cseq_send++);
-    header.emplace("User-Agent",kServerName);
+    header.emplace("CSeq", StrPrinter << _cseq_send++);
+    header.emplace("User-Agent", kServerName);
 
-    if(!_session_id.empty()){
+    if (!_session_id.empty()) {
         header.emplace("Session", _session_id);
     }
 
-    if(!_realm.empty() && !(*this)[Client::kRtspUser].empty()){
-        if(!_md5_nonce.empty()){
-            //MD5认证
+    if (!_realm.empty() && !(*this)[Client::kRtspUser].empty()) {
+        if (!_md5_nonce.empty()) {
+            // MD5认证
             /*
             response计算方法如下：
             RTSP客户端应该使用username + password并计算response如下:
@@ -588,7 +599,7 @@ void RtspPlayer::sendRtspRequest(const string &cmd, const string &url,const StrC
                 response= md5( md5(username:realm:password):nonce:md5(public_method:url) );
              */
             string encrypted_pwd = (*this)[Client::kRtspPwd];
-            if(!(*this)[Client::kRtspPwdIsMD5].as<bool>()){
+            if (!(*this)[Client::kRtspPwdIsMD5].as<bool>()) {
                 encrypted_pwd = MD5((*this)[Client::kRtspUser] + ":" + _realm + ":" + encrypted_pwd).hexdigest();
             }
             auto response = MD5(encrypted_pwd + ":" + _md5_nonce + ":" + MD5(cmd + ":" + url).hexdigest()).hexdigest();
@@ -599,13 +610,11 @@ void RtspPlayer::sendRtspRequest(const string &cmd, const string &url,const StrC
             printer << "nonce=\"" << _md5_nonce << "\", ";
             printer << "uri=\"" << url << "\", ";
             printer << "response=\"" << response << "\"";
-            header.emplace("Authorization",printer);
-        }else if(!(*this)[Client::kRtspPwdIsMD5].as<bool>()){
-            //base64认证
-            string authStr = StrPrinter << (*this)[Client::kRtspUser] << ":" << (*this)[Client::kRtspPwd];
-            char authStrBase64[1024] = {0};
-            av_base64_encode(authStrBase64, sizeof(authStrBase64), (uint8_t *) authStr.data(), (int) authStr.size());
-            header.emplace("Authorization",StrPrinter << "Basic " << authStrBase64 );
+            header.emplace("Authorization", printer);
+        } else if (!(*this)[Client::kRtspPwdIsMD5].as<bool>()) {
+            // base64认证
+            auto authStrBase64 = encodeBase64((*this)[Client::kRtspUser] + ":" + (*this)[Client::kRtspPwd]);
+            header.emplace("Authorization", StrPrinter << "Basic " << authStrBase64);
         }
     }
 

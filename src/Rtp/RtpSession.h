@@ -13,7 +13,7 @@
 
 #if defined(ENABLE_RTPPROXY)
 
-#include "Network/TcpSession.h"
+#include "Network/Session.h"
 #include "RtpSplitter.h"
 #include "RtpProcess.h"
 #include "Util/TimeTicker.h"
@@ -23,7 +23,6 @@ namespace mediakit{
 class RtpSession : public toolkit::Session, public RtpSplitter, public MediaSourceEvent {
 public:
     static const std::string kStreamID;
-    static const std::string kIsUDP;
     static const std::string kSSRC;
 
     RtpSession(const toolkit::Socket::Ptr &sock);
@@ -35,7 +34,7 @@ public:
 
 protected:
     // 通知其停止推流
-    bool close(MediaSource &sender,bool force) override;
+    bool close(MediaSource &sender) override;
     // 收到rtp回调
     void onRtpPacket(const char *data, size_t len) override;
     // RtpSplitter override
@@ -50,8 +49,6 @@ private:
     std::string _stream_id;
     struct sockaddr_storage _addr;
     RtpProcess::Ptr _process;
-    std::shared_ptr<toolkit::ObjectStatistic<toolkit::TcpSession> > _statistic_tcp;
-    std::shared_ptr<toolkit::ObjectStatistic<toolkit::UdpSession> > _statistic_udp;
 };
 
 }//namespace mediakit
