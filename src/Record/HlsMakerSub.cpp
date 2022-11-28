@@ -47,13 +47,17 @@ void HlsMakerSub::startRecord(bool isRecord) {
     if (isRecord) {
         std::map<uint64_t, std::string> delete_file_paths = _segment_file_paths;
         _segment_file_paths.clear();
+        int count = 0;
         //删除_segment_file_paths路径对应的直播文件,过30s再删除，免得hls直播突然断掉
         for (auto it : delete_file_paths) {
-            auto ts_path = it.second;
-            _poller->doDelayTask(30 * 1000, [ts_path]() {
-                File::delete_file(ts_path.data());
-                return 0;
-            });
+            count ++;
+            if (count < delete_file_paths.size()) {
+                auto ts_path = it.second;
+                _poller->doDelayTask(30 * 1000, [ts_path]() {
+                    File::delete_file(ts_path.data());
+                    return 0;
+                });
+            }
         }
     }
 
