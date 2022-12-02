@@ -14,6 +14,7 @@
 //#include "HlsMakerImp.h"
 #include "HlsMakerImpSub.h"
 #include "MPEG.h"
+#include "Common/config.h"
 
 namespace mediakit {
 

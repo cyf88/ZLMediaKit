@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
@@ -7,15 +7,16 @@
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
  */
-
+#include <mutex>
 #include "Util/util.h"
 #include "Util/NoticeCenter.h"
 #include "Network/sockutil.h"
 #include "Network/Session.h"
 #include "MediaSource.h"
 #include "Common/config.h"
+#include "Common/Parser.h"
 #include "Record/MP4Reader.h"
-
+#include "PacketCache.h"
 using namespace std;
 using namespace toolkit;
 
@@ -124,7 +125,6 @@ MediaSource::MediaSource(const string &schema, const string &vhost, const string
     _app = app;
     _stream_id = stream_id;
     _create_stamp = time(NULL);
-    //_default_poller = EventPollerPool::Instance().getPoller();
 }
 
 MediaSource::~MediaSource() {
@@ -289,24 +289,10 @@ toolkit::EventPoller::Ptr MediaSource::getOwnerPoller() {
     if (listener) {
         return listener->getOwnerPoller(*this);
     }
-   // WarnL << toolkit::demangle(typeid(*this).name()) + "::getOwnerPoller failed, now return default poller: " + getUrl();
-    //return _default_poller;
     throw std::runtime_error(toolkit::demangle(typeid(*this).name()) + "::getOwnerPoller failed: " + getUrl());
 }
 
 void MediaSource::onReaderChanged(int size) {
-    //weak_ptr<MediaSource> weak_self = shared_from_this();
-    //auto listener = _listener.lock();
-    //if (!listener) {
-    //    return;
-    //}
-    //getOwnerPoller()->async([weak_self, size, listener]() {
-    //    auto strong_self = weak_self.lock();
-    //    if (!strong_self) {
-    //        return;
-    //    }
-    //    listener->onReaderChanged(*strong_self, size);
-    //});
     try {
         weak_ptr<MediaSource> weak_self = shared_from_this();
         getOwnerPoller()->async([weak_self, size]() {
