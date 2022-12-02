@@ -1,4 +1,4 @@
-﻿/*
+/*
 * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
 *
 * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
@@ -199,8 +199,9 @@ bool MultiMediaSourceMuxer::setupRecord(MediaSource &sender, Recorder::type type
     });
     switch (type) {
         case Recorder::type_hls : {
-            if (start && !_hls) {
-                //开始录制
+            if (!_hls)
+            {
+                //创建hls对象
                 _option.hls_save_path = custom_path;
                 auto hls = dynamic_pointer_cast<HlsRecorder>(makeRecorder(sender, getTracks(), type, _option));
                 if (hls) {
@@ -208,10 +209,8 @@ bool MultiMediaSourceMuxer::setupRecord(MediaSource &sender, Recorder::type type
                     hls->setListener(shared_from_this());
                 }
                 _hls = hls;
-            } else if (!start && _hls) {
-                //停止录制
-                _hls = nullptr;
             }
+              _hls->startRecord(start);         
             return true;
         }
         case Recorder::type_mp4 : {
@@ -234,7 +233,12 @@ bool MultiMediaSourceMuxer::setupRecord(MediaSource &sender, Recorder::type type
 bool MultiMediaSourceMuxer::isRecording(MediaSource &sender, Recorder::type type) {
     switch (type){
         case Recorder::type_hls :
-            return !!_hls;
+            //return !!_hls;
+            if (_hls){
+                return _hls->getRecordFlag();
+            }else{
+                return false;
+            }
         case Recorder::type_mp4 :
             return !!_mp4;
         default:
