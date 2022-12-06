@@ -662,32 +662,65 @@ void MediaSourceEvent::onReaderChanged(MediaSource &sender, int size){
     //没有任何人观看该视频源，表明该源可以关闭了
     GET_CONFIG(string, record_app, Record::kAppName);
     GET_CONFIG(int, stream_none_reader_delay, General::kStreamNoneReaderDelayMS);
+    GET_CONFIG(int, no_record_stream_none_reader_delay, General::kNoRecordStreamNoneReaderDelayMS);
     //如果mp4点播, 无人观看时我们强制关闭点播
     bool is_mp4_vod = sender.getApp() == record_app;
     weak_ptr<MediaSource> weak_sender = sender.shared_from_this();
+    
+    if(sender.isRecording(Recorder::type_hls)) {//如果正在录像
+        _async_close_timer = std::make_shared<Timer>(
+            stream_none_reader_delay / 1000.0f,
+            [weak_sender, is_mp4_vod]() {
+                auto strong_sender = weak_sender.lock();
+                if (!strong_sender) {
+                    //对象已经销毁
+                    return false;
+                }
 
-    _async_close_timer = std::make_shared<Timer>(stream_none_reader_delay / 1000.0f, [weak_sender, is_mp4_vod]() {
-        auto strong_sender = weak_sender.lock();
-        if (!strong_sender) {
-            //对象已经销毁
-            return false;
-        }
+                if (strong_sender->totalReaderCount()) {
+                    //还有人观看该视频，不触发关闭事件
+                    return false;
+                }
 
-        if (strong_sender->totalReaderCount()) {
-            //还有人观看该视频，不触发关闭事件
-            return false;
-        }
+                if (!is_mp4_vod) {
+                    //直播时触发无人观看事件，让开发者自行选择是否关闭
+                    NoticeCenter::Instance().emitEvent(Broadcast::kBroadcastStreamNoneReader, *strong_sender);
+                } else {
+                    //这个是mp4点播，我们自动关闭
+                    WarnL << "MP4点播无人观看,自动关闭:" << strong_sender->getUrl();
+                    strong_sender->close(false);
+                }
+                return false;
+            },
+            nullptr);
+    } else {//没有录像的话
+        _async_close_timer = std::make_shared<Timer>(
+            no_record_stream_none_reader_delay / 1000.0f,
+            [weak_sender, is_mp4_vod]() {
+                auto strong_sender = weak_sender.lock();
+                if (!strong_sender) {
+                    //对象已经销毁
+                    return false;
+                }
 
-        if (!is_mp4_vod) {
-            //直播时触发无人观看事件，让开发者自行选择是否关闭
-            NoticeCenter::Instance().emitEvent(Broadcast::kBroadcastStreamNoneReader, *strong_sender);
-        } else {
-            //这个是mp4点播，我们自动关闭
-            WarnL << "MP4点播无人观看,自动关闭:" << strong_sender->getUrl();
-            strong_sender->close(false);
-        }
-        return false;
-    }, nullptr);
+                if (strong_sender->totalReaderCount()) {
+                    //还有人观看该视频，不触发关闭事件
+                    return false;
+                }
+
+                if (!is_mp4_vod) {
+                    //直播时触发无人观看事件，让开发者自行选择是否关闭
+                    NoticeCenter::Instance().emitEvent(Broadcast::kBroadcastStreamNoneReader, *strong_sender);
+                } else {
+                    //这个是mp4点播，我们自动关闭
+                    WarnL << "MP4点播无人观看,自动关闭:" << strong_sender->getUrl();
+                    strong_sender->close(false);
+                }
+                return false;
+            },
+            nullptr);
+    }
+    
 }
 
 string MediaSourceEvent::getOriginUrl(MediaSource &sender) const {
