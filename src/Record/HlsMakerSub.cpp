@@ -30,7 +30,7 @@ HlsMakerSub::HlsMakerSub(float seg_duration, uint32_t seg_number, bool seg_keep)
     _seg_duration = seg_duration;
     _seg_keep = seg_keep;
     _is_record = false;
-    _poller = EventPollerPool::Instance().getPoller();
+    //_poller = EventPollerPool::Instance().getPoller();
 }
 
 HlsMakerSub::~HlsMakerSub() {
@@ -53,10 +53,11 @@ void HlsMakerSub::startRecord(bool isRecord) {
             count ++;
             if (count < delete_file_paths.size()) {
                 auto ts_path = it.second;
-                _poller->doDelayTask(30 * 1000, [ts_path]() {
-                    File::delete_file(ts_path.data());
-                    return 0;
-                });
+                File::delete_file(ts_path.data());
+                //_poller->doDelayTask(30 * 1000, [ts_path]() {
+                //    File::delete_file(ts_path.data());
+                //    return 0;
+                //});
             }
         }
     }
