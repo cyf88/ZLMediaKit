@@ -43,24 +43,24 @@ void HlsMakerSub::startRecord(bool isRecord) {
     if (isRecord == _is_record) {
         return;
     }
-    //如果是录像，则删除之前直播的8个ts文件
-    if (isRecord) {
-        std::map<uint64_t, std::string> delete_file_paths = _segment_file_paths;
-        _segment_file_paths.clear();
-        int count = 0;
-        //删除_segment_file_paths路径对应的直播文件,过30s再删除，免得hls直播突然断掉
-        for (auto it : delete_file_paths) {
-            count ++;
-            if (count < delete_file_paths.size()) {
-                auto ts_path = it.second;
-                File::delete_file(ts_path.data());
-                //_poller->doDelayTask(30 * 1000, [ts_path]() {
-                //    File::delete_file(ts_path.data());
-                //    return 0;
-                //});
-            }
-        }
-    }
+    ////如果是录像，则删除之前直播的8个ts文件
+    //if (isRecord) {
+    //    std::map<uint64_t, std::string> delete_file_paths = _segment_file_paths;
+    //    _segment_file_paths.clear();
+    //    int count = 0;
+    //    //删除_segment_file_paths路径对应的直播文件,过10s再删除，免得hls直播突然断掉
+    //    for (auto it : delete_file_paths) {
+    //        count ++;
+    //        if (count < delete_file_paths.size()) {
+    //            auto ts_path = it.second;
+    //            File::delete_file(ts_path.data());
+    //            _poller->doDelayTask(10 * 1000, [ts_path]() {
+    //                File::delete_file(ts_path.data());
+    //                return 0;
+    //            });
+    //        }
+    //    }
+    //}
 
     if(isRecord) {
         _seg_keep = true;
