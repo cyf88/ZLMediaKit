@@ -668,6 +668,8 @@ void MediaSourceEvent::onReaderChanged(MediaSource &sender, int size){
     weak_ptr<MediaSource> weak_sender = sender.shared_from_this();
     
     if(sender.isRecording(Recorder::type_hls)) {//如果正在录像
+        WarnL << "************The stream is Recording.*************";
+        WarnL << sender.getUrl();
         _async_close_timer = std::make_shared<Timer>(
             stream_none_reader_delay / 1000.0f,
             [weak_sender, is_mp4_vod]() {
@@ -694,6 +696,8 @@ void MediaSourceEvent::onReaderChanged(MediaSource &sender, int size){
             },
             nullptr);
     } else {//没有录像的话
+        WarnL << "************The stream is Not Recording.*************";
+        WarnL << sender.getUrl();
         _async_close_timer = std::make_shared<Timer>(
             no_record_stream_none_reader_delay / 1000.0f,
             [weak_sender, is_mp4_vod]() {
