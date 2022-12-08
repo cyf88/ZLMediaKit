@@ -63,12 +63,13 @@ void HlsMakerImpSub::clearCache(bool immediately, bool eof) {
 
     //程序异常退出的情况下，直播的8个ts文件还是无法删除，
     //这里先删除掉m3u8文件对应的3个ts文件。还有保留的5个ts文件无法删除，能删除几个是几个吧。
-    fstream file(_path_prefix + "/hls.m3u8");
-    string data;
-    while (getline(file,data)) {
-        string ts_path = _path_prefix + "/" + data;
-        File::delete_file(ts_path.data());
-    }
+    //fstream file(_path_prefix + "/hls.m3u8");
+    //string data;
+    //while (getline(file,data)) {
+    //    string ts_path = _path_prefix + "/" + data;
+    //    File::delete_file(ts_path.data());
+    //}
+    //file.close();
 
     //删除缓存的m3u8文件
     File::delete_file((_path_prefix + "/hls.m3u8").data());
