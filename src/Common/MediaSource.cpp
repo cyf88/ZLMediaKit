@@ -666,7 +666,7 @@ void MediaSourceEvent::onReaderChanged(MediaSource &sender, int size){
     //如果mp4点播, 无人观看时我们强制关闭点播
     bool is_mp4_vod = sender.getApp() == record_app;
     weak_ptr<MediaSource> weak_sender = sender.shared_from_this();
-    
+
     if(sender.isRecording(Recorder::type_hls)) {//如果正在录像
         WarnL << "************The stream is Recording.*************";
         WarnL << sender.getUrl();
@@ -702,6 +702,10 @@ void MediaSourceEvent::onReaderChanged(MediaSource &sender, int size){
             no_record_stream_none_reader_delay / 1000.0f,
             [weak_sender, is_mp4_vod]() {
                 auto strong_sender = weak_sender.lock();
+                
+                if (strong_sender->isRecording(Recorder::type_hls)) {
+                    return false;
+                }
                 if (!strong_sender) {
                     //对象已经销毁
                     return false;
