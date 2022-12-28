@@ -8,12 +8,16 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef HLSMAKER_H
-#define HLSMAKER_H
+#ifndef HLSMAKERSUB_H
+#define HLSMAKERSUB_H
 
-#include <string>
 #include <deque>
 #include <tuple>
+#include "Common/config.h"
+#include "Util/TimeTicker.h"
+#include "Util/File.h"
+#include "Util/util.h"
+#include "Util/logger.h"
 
 namespace mediakit {
 
@@ -50,6 +54,8 @@ public:
      * 清空记录
      */
     void clear();
+    //设置是否录像标志
+    void startRecord(bool isRecord);
 
 protected:
     /**
@@ -82,6 +88,7 @@ protected:
      * @param duration_ms 上一个 ts 切片的时长, 单位为毫秒
      */
     virtual void onFlushLastSegment(uint64_t duration_ms) {};
+    virtual std::string getPathPrefix() = 0;
 
     /**
      * 关闭上个ts切片并且写入m3u8索引
@@ -107,6 +114,11 @@ private:
      */
     void addNewSegment(uint64_t timestamp);
 
+    //新增函数，实现录像功能
+    std::string getTsFile(const std::string &file_content);
+    std::string getM3u8TSBody(const std::string &file_content);
+    void createM3u8FileForRecord();
+
 private:
     float _seg_duration = 0;
     uint32_t _seg_number = 0;
@@ -116,7 +128,13 @@ private:
     uint64_t _file_index = 0;
     std::string _last_file_name;
     std::deque<std::tuple<int,std::string> > _seg_dur_list;
+    bool _is_record = false;
+    bool _is_close_stream = false;
+    std::string _m3u8_file_path;
+
+public:
+    std::map<uint64_t /*index*/, std::string /*file_path*/> _segment_file_paths;
 };
 
 }//namespace mediakit
-#endif //HLSMAKER_H
+#endif //HLSMAKERSUB_H

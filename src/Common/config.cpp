@@ -66,6 +66,7 @@ namespace General {
 const string kMediaServerId = GENERAL_FIELD "mediaServerId";
 const string kFlowThreshold = GENERAL_FIELD "flowThreshold";
 const string kStreamNoneReaderDelayMS = GENERAL_FIELD "streamNoneReaderDelayMS";
+const string kNoRecordStreamNoneReaderDelayMS = GENERAL_FIELD "noRecordStreamNoneReaderDelayMS";
 const string kMaxStreamWaitTimeMS = GENERAL_FIELD "maxStreamWaitMS";
 const string kEnableVhost = GENERAL_FIELD "enableVhost";
 const string kResetWhenRePlay = GENERAL_FIELD "resetWhenRePlay";
@@ -79,6 +80,7 @@ const string kUnreadyFrameCache = GENERAL_FIELD "unready_frame_cache";
 static onceToken token([]() {
     mINI::Instance()[kFlowThreshold] = 1024;
     mINI::Instance()[kStreamNoneReaderDelayMS] = 20 * 1000;
+    mINI::Instance()[kNoRecordStreamNoneReaderDelayMS] = 130 * 1000;
     mINI::Instance()[kMaxStreamWaitTimeMS] = 15 * 1000;
     mINI::Instance()[kEnableVhost] = 0;
     mINI::Instance()[kResetWhenRePlay] = 1;
