@@ -8,10 +8,19 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
+ #include "Util/File.h"
 #include "HlsMaker.h"
-#include "Common/config.h"
+#if defined(_WIN32)
+#include <io.h>
+#define _access access
+#else
+#include <unistd.h>
+#include <dirent.h>
+#endif // WIN32
+
 
 using namespace std;
+using namespace toolkit;
 
 namespace mediakit {
 
@@ -20,9 +29,27 @@ HlsMaker::HlsMaker(float seg_duration, uint32_t seg_number, bool seg_keep) {
     _seg_number = seg_number;
     _seg_duration = seg_duration;
     _seg_keep = seg_keep;
+    _is_record = false;
 }
 
 HlsMaker::~HlsMaker() {
+
+    _is_close_stream = true;
+}
+
+void HlsMaker::startRecord(bool isRecord) {
+    //本来已经在录像，再次点击录像，或者本来已经停止录像，再次点击停止录像，直接返回
+    if (isRecord == _is_record) {
+        return;
+    }
+
+    if(isRecord) {
+        _seg_keep = true;
+    }else{
+        _seg_keep = false;
+        _is_close_stream = true;   
+    }
+    _is_record = isRecord;
 }
 
 
@@ -126,13 +153,15 @@ void HlsMaker::addNewSegment(uint64_t stamp) {
 
     //关闭并保存上一个切片，如果_seg_number==0,那么是点播。
     flushLastSegment(false);
+
     //新增切片
     _last_file_name = onOpenSegment(_file_index++);
     //记录本次切片的起始时间戳
     _last_seg_timestamp = _last_timestamp ? _last_timestamp : stamp;
+
 }
 
-void HlsMaker::flushLastSegment(bool eof){
+void HlsMaker::flushLastSegment(bool eof) {
     if (_last_file_name.empty()) {
         //不存在上个切片
         return;
@@ -148,6 +177,11 @@ void HlsMaker::flushLastSegment(bool eof){
     onFlushLastSegment(seg_dur);
     //然后写m3u8文件
     makeIndexFile(eof);
+    //判断当前是否在录像，正在录像的话，生成录像的m3u8文件
+    if (_is_record) {
+        createM3u8FileForRecord();
+    }
+    
 }
 
 bool HlsMaker::isLive() {
@@ -164,6 +198,111 @@ void HlsMaker::clear() {
     _last_seg_timestamp = 0;
     _seg_dur_list.clear();
     _last_file_name.clear();
+
+}
+
+std::string HlsMaker::getM3u8TSBody(const std::string &file_content) {
+    
+    string new_file = file_content;
+    if (file_content.find("#EXT-X-ENDLIST") != file_content.npos) {
+        //找到了，则去掉"#EXT-X-ENDLIST"
+        new_file = file_content.substr(0, file_content.length() - 15);
+    }
+
+    string body = new_file.substr(new_file.find_last_of("#"));
+    //此时的body为
+    //#EXTINF:4.534,
+    //2022-09-14/08/2022-09-14_08-35-16.ts
+    string extinf = body.substr(0, body.find(",")+2);
+    string tsFile = body.substr(body.find_last_of("/") + 1);
+    body.append("#EXT-X-ENDLIST\n");
+
+    return extinf + tsFile + "#EXT-X-ENDLIST\n";
+}
+
+std::string HlsMaker::getTsFile(const std::string &file_content) {
+    //  最后一个TS的body为
+    //  2022-09-13/13/58-13_43.ts
+    //  #EXT-X-ENDLIST
+    string body = file_content.substr(file_content.find_last_of(",") + 2);
+    string ts_file_name = body.substr(body.find_last_of("/") + 1);
+    if (ts_file_name.find("#EXT-X-ENDLIST") == ts_file_name.npos ) {
+        ts_file_name = ts_file_name.substr(0, ts_file_name.length() - 4); //没找到，去掉“.ts\n”，只留名字
+    } else {
+        ts_file_name = ts_file_name.substr(0, ts_file_name.length() - 19); //找到的话，去掉“.ts\n#EXT-X-ENDLIST\n”，只留名字
+    }
+    
+    return ts_file_name;
+}
+
+void HlsMaker::createM3u8FileForRecord() {
+    // 1.读取直播目录下的m3u8文件，获取当前的ts文件以及时长，并生成m3u8文件的路径
+    string live_file = File::loadFile((getPathPrefix() + "/hls.m3u8").data());
+    if (live_file.empty()) {
+        return;
+    }
+
+    string body = getM3u8TSBody(live_file);
+    string ts_file_name = getTsFile(live_file); // ts_file: 2022-09-14_11-06-03
+    string m3u8_file = getPathPrefix() + "/" + ts_file_name.substr(0, 10) + "/" + ts_file_name.substr(11, 2) + "/";
+
+    // 2.判断该目录下有没有m3u8文件，没有的话，生成第一个m3u8文件，有的话，重命名
+    int handle = -1;
+    DIR *dir_info = opendir(m3u8_file.data());
+    struct dirent *dir_entry;
+    if (dir_info) {
+        while ((dir_entry =readdir(dir_info)) != NULL) {
+            if (end_with(dir_entry->d_name, ".m3u8")) {
+                handle = 0;
+                break;
+            }
+        }
+        closedir(dir_info);
+    } else {
+        return;
+    }
+
+   if (-1 == handle) {//第一次播放流
+        _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
+        _is_close_stream = false;
+    } else {//断流过，一次以上播放
+       if (_is_close_stream) {
+           _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
+           _is_close_stream = false;
+       }
+       if (_m3u8_file_path.length() == 0) { //服务重启后，进来，_m3u8_file_path为空
+           _m3u8_file_path = m3u8_file + ts_file_name + ".m3u8";
+       }
+   }
+
+    if (_m3u8_file_path.empty()) {
+        WarnL << "create m3u8 file failed, _m3u8_file_path is empty."  ;
+        return;
+    }
+
+    //3.写m3u8文件
+    string m3u8Header = "#EXTM3U\n"
+                        "#EXT-X-PLAYLIST-TYPE:EVENT\n"
+                        "#EXT-X-VERSION:4\n"
+                        "#EXT-X-TARGETDURATION:2\n"
+                        "#EXT-X-MEDIA-SEQUENCE:0\n";
+
+    if (access(_m3u8_file_path.data(), 0) != 0) { //文件不存在
+        auto file = File::create_file(_m3u8_file_path.data(), "wb");
+        if (file) {
+            fwrite(m3u8Header.data(), m3u8Header.size(), 1, file);
+            fwrite(body.data(), body.size(), 1, file);
+            fclose(file);
+        }
+    } else {
+        // 第二次进来，去掉 "#EXT-X-ENDLIST\n"，再重新追加file_content，保存文件
+        auto file = File::create_file(_m3u8_file_path.data(), "r+");
+        if (file) {
+            fseek(file, -15, SEEK_END);
+            fwrite(body.data(), body.size(), 1, file);
+            fclose(file);
+        } 
+    }
 }
 
 }//namespace mediakit
