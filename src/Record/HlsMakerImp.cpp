@@ -13,21 +13,19 @@
 #include "HlsMakerImp.h"
 #include "Util/util.h"
 #include "Util/uv_errno.h"
-#include "Util/File.h"
-#include "Common/config.h"
 
 using namespace std;
 using namespace toolkit;
 
 namespace mediakit {
 
-HlsMakerImp::HlsMakerImp(const string &m3u8_file,
+HlsMakerImp::HlsMakerImp(
+    const string &m3u8_file,
                          const string &params,
                          uint32_t bufSize,
                          float seg_duration,
                          uint32_t seg_number,
                          bool seg_keep):HlsMaker(seg_duration, seg_number, seg_keep) {
-    _poller = EventPollerPool::Instance().getPoller();
     _path_prefix = m3u8_file.substr(0, m3u8_file.rfind('/'));
     _path_hls = m3u8_file;
     _params = params;
@@ -56,33 +54,29 @@ void HlsMakerImp::clearCache(bool immediately, bool eof) {
 
     clear();
     _file = nullptr;
+    //删除_segment_file_paths路径对应的直播文件
+    for (auto it : _segment_file_paths) {
+        auto ts_path = it.second;
+        File::delete_file(ts_path.data());
+    }
     _segment_file_paths.clear();
 
-    //hls直播才删除文件
-    GET_CONFIG(uint32_t, delay, Hls::kDeleteDelaySec);
-    if (!delay || immediately) {
-        File::delete_file(_path_prefix.data());
-    } else {
-        auto path_prefix = _path_prefix;
-        _poller->doDelayTask(delay * 1000, [path_prefix]() {
-            File::delete_file(path_prefix.data());
-            return 0;
-        });
-    }
+    //删除缓存的m3u8文件
+    File::delete_file((_path_prefix + "/hls.m3u8").data());
 }
 
 string HlsMakerImp::onOpenSegment(uint64_t index) {
     string segment_name, segment_path;
-    {
-        auto strDate = getTimeStr("%Y-%m-%d");
-        auto strHour = getTimeStr("%H");
-        auto strTime = getTimeStr("%M-%S");
-        segment_name = StrPrinter << strDate + "/" + strHour + "/" + strTime << "_" << index << ".ts";
-        segment_path = _path_prefix + "/" + segment_name;
-        if (isLive()) {
-            _segment_file_paths.emplace(index, segment_path);
-        }
+    
+    auto strDate = getTimeStr("%Y-%m-%d");
+    auto strHour = getTimeStr("%H");
+    auto strTime = getTimeStr("%M-%S");
+    segment_name = StrPrinter << strDate + "_" + strHour + "-" + strTime << ".ts";
+    segment_path = _path_prefix + "/" + strDate + "/" + strHour + "/" + segment_name;
+    if ((!isKeep())) {
+        _segment_file_paths.emplace(index, segment_path);
     }
+    
     _file = makeFile(segment_path, true);
 
     //保存本切片的元数据
@@ -93,11 +87,12 @@ string HlsMakerImp::onOpenSegment(uint64_t index) {
 
     if (!_file) {
         WarnL << "create file failed," << segment_path << " " << get_uv_errmsg();
+        return "";
     }
     if (_params.empty()) {
-        return segment_name;
+        return strDate + "/" + strHour + "/" + segment_name;
     }
-    return segment_name + "?" + _params;
+    return strDate + "/" + strHour + "/" + segment_name + "?" + _params;
 }
 
 void HlsMakerImp::onDelSegment(uint64_t index) {
@@ -166,6 +161,10 @@ void HlsMakerImp::setMediaSource(const string &vhost, const string &app, const s
 
 HlsMediaSource::Ptr HlsMakerImp::getMediaSource() const {
     return _media_src;
+}
+
+std::string HlsMakerImp::getPathPrefix() {
+    return _path_prefix;
 }
 
 }//namespace mediakit

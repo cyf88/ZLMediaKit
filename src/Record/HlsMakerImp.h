@@ -8,8 +8,8 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef HLSMAKERIMP_H
-#define HLSMAKERIMP_H
+#ifndef HLSMAKERIMPSUB_H
+#define HLSMAKERIMPSUB_H
 
 #include <memory>
 #include <string>
@@ -21,7 +21,8 @@ namespace mediakit {
 
 class HlsMakerImp : public HlsMaker{
 public:
-    HlsMakerImp(const std::string &m3u8_file,
+    HlsMakerImp(
+        const std::string &m3u8_file,
                 const std::string &params,
                 uint32_t bufSize  = 64 * 1024,
                 float seg_duration = 5,
@@ -55,6 +56,7 @@ protected:
     void onWriteSegment(const char *data, size_t len) override;
     void onWriteHls(const std::string &data) override;
     void onFlushLastSegment(uint64_t duration_ms) override;
+    std::string getPathPrefix() override;
 
 private:
     std::shared_ptr<FILE> makeFile(const std::string &file,bool setbuf = false);
@@ -69,9 +71,8 @@ private:
     std::shared_ptr<FILE> _file;
     std::shared_ptr<char> _file_buf;
     HlsMediaSource::Ptr _media_src;
-    toolkit::EventPoller::Ptr _poller;
-    std::map<uint64_t/*index*/,std::string/*file_path*/> _segment_file_paths;
+
 };
 
 }//namespace mediakit
-#endif //HLSMAKERIMP_H
+#endif //HLSMAKERIMPSUB_H

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
@@ -26,7 +26,6 @@ public:
         GET_CONFIG(bool, hlsKeep, Hls::kSegmentKeep);
         GET_CONFIG(uint32_t, hlsBufSize, Hls::kFileBufSize);
         GET_CONFIG(float, hlsDuration, Hls::kSegmentDuration);
-
         _option = option;
         _hls = std::make_shared<HlsMakerImp>(m3u8_file, params, hlsBufSize, hlsDuration, hlsNum, hlsKeep);
         //清空上次的残余文件
@@ -73,6 +72,12 @@ public:
         //缓存尚未清空时，还允许触发inputFrame函数，以便及时清空缓存
         return _option.hls_demand ? (_clear_cache ? true : _enabled) : true;
     }
+    void startRecord(bool flag) {
+        _hls->startRecord(flag);
+        _is_record = flag;
+    }
+
+    bool getRecordFlag() { return _is_record; }
 
 private:
     void onWrite(std::shared_ptr<toolkit::Buffer> buffer, uint64_t timestamp, bool key_pos) override {
@@ -88,6 +93,7 @@ private:
     bool _clear_cache = false;
     ProtocolOption _option;
     std::shared_ptr<HlsMakerImp> _hls;
+    bool _is_record = false;
 };
 }//namespace mediakit
 #endif //HLSRECORDER_H
