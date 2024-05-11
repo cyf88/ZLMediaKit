@@ -27,6 +27,7 @@ extern CodecPlugin opus_plugin;
 extern CodecPlugin g711a_plugin;
 extern CodecPlugin g711u_plugin;
 extern CodecPlugin l16_plugin;
+extern CodecPlugin svac_plugin;
 
 REGISTER_CODEC(h264_plugin);
 REGISTER_CODEC(h265_plugin);
@@ -36,6 +37,7 @@ REGISTER_CODEC(opus_plugin);
 REGISTER_CODEC(g711a_plugin)
 REGISTER_CODEC(g711u_plugin);
 REGISTER_CODEC(l16_plugin);
+REGISTER_CODEC(svac_plugin);
 
 void Factory::registerPlugin(const CodecPlugin &plugin) {
     InfoL << "Load codec: " << getCodecName(plugin.getCodec());

@@ -177,6 +177,7 @@ bool FrameMerger::willFlush(const Frame::Ptr &frame) const{
             bool new_frame = false;
             switch (frame->getCodecId()) {
                 case CodecH264:
+                case CodecSVAC:
                 case CodecH265: {
                     //如果是新的一帧，前面的缓存需要输出
                     new_frame = frame->prefixSize();
@@ -235,6 +236,7 @@ void FrameMerger::doMerge(BufferLikeString &merged, const Frame::Ptr &frame) con
 static bool isNeedMerge(CodecId codec){
     switch (codec) {
         case CodecH264:
+        case CodecSVAC:
         case CodecH265: return true;
         default: return false;
     }
