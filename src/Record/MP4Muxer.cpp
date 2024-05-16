@@ -82,6 +82,8 @@ void MP4MuxerInterface::flush() {
     }
 }
 
+static int j =0;
+static int i=0;
 bool MP4MuxerInterface::inputFrame(const Frame::Ptr &frame) {
     auto it = _tracks.find(frame->getIndex());
     if (it == _tracks.end()) {
@@ -105,10 +107,20 @@ bool MP4MuxerInterface::inputFrame(const Frame::Ptr &frame) {
         case CodecH264:
         case CodecSVAC:
         case CodecH265: {
+
+            std::ofstream outfile;
+            outfile.open((std::string("D://svac//write//before//framebefore.") + std::to_string(j++)).c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+            outfile.write(frame->data(), frame->size());
+            outfile.close();
             // 这里的代码逻辑是让SPS、PPS、IDR这些时间戳相同的帧打包到一起当做一个帧处理，
             track.merger.inputFrame(frame, [this, &track](uint64_t dts, uint64_t pts, const Buffer::Ptr &buffer, bool have_idr) {
                 int64_t dts_out, pts_out;
                 track.stamp.revise(dts, pts, dts_out, pts_out);
+                //cyf test 写入mp4的数据
+                std::ofstream outfile2;
+                outfile2.open((std::string("D://svac//write//after//frameafter.") + std::to_string(i++)).c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+                outfile2.write(buffer->data(), buffer->size());
+                outfile2.close();
                 mp4_writer_write(_mov_writter.get(), track.track_id, buffer->data(), buffer->size(), pts_out, dts_out, have_idr ? MOV_AV_FLAG_KEYFREAME : 0);
             });
             break;
@@ -117,6 +129,10 @@ bool MP4MuxerInterface::inputFrame(const Frame::Ptr &frame) {
         default: {
             int64_t dts_out, pts_out;
             track.stamp.revise(frame->dts(), frame->pts(), dts_out, pts_out);
+//            std::ofstream outfile;
+//            outfile.open((std::string("D://svac//write//frame.") + std::to_string(j++)).c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+//            outfile.write(frame->data() + frame->prefixSize() , frame->size() - frame->prefixSize());
+//            outfile.close();
             mp4_writer_write(_mov_writter.get(), track.track_id, frame->data() + frame->prefixSize(), frame->size() - frame->prefixSize(), pts_out, dts_out, frame->keyFrame() ? MOV_AV_FLAG_KEYFREAME : 0);
             break;
         }

@@ -135,10 +135,16 @@ bool SVACTrack::ready() const {
    return !_sps.empty() && !_pps.empty();
 }
 
+static int j = 0;
 bool SVACTrack::inputFrame(const Frame::Ptr &frame) {
    using SVACFrameInternal = FrameInternal<SVACFrameNoCacheAble>;
    int type = SVAC_TYPE(frame->data()[frame->prefixSize()]);
-  
+
+   //cyf test  这边输入的是脱去PS头后的帧 config帧和数据帧在一起
+//   std::ofstream outfile;
+//   outfile.open((std::string("D://svac//read//frame.") + std::to_string(j++)).c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+//   outfile.write((char *)frame->data(), frame->size());
+//   outfile.close();
    if ((type == SVACFrame::NAL_NONE_IDR || type == SVACFrame::NAL_IDR) && ready()) {
        return inputFrame_l(frame);
    }
@@ -168,6 +174,7 @@ Track::Ptr SVACTrack::clone() const {
 }
 
 bool SVACTrack::inputFrame_l(const Frame::Ptr &frame) {
+   char* buf =  frame->data();
    int type = SVAC_TYPE(frame->data()[frame->prefixSize()]);
    bool ret = true;
    switch (type) {

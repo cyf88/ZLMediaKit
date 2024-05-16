@@ -78,6 +78,8 @@ public:
        auto nal_ptr = (uint8_t *) this->data() + this->prefixSize();
        auto type = SVAC_TYPE(*nal_ptr);
        //多slice情况下, first_mb_in_slice 表示其为一帧的开始
+       //cyf 不分割帧的情况下所有的帧都是可以解码的
+       return true;
        return type >= NAL_NONE_IDR && type <= NAL_IDR && (nal_ptr[1] & 0x80);
    }
 };

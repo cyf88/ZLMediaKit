@@ -57,7 +57,12 @@ int MP4Demuxer::getAllTracks() {
 }
 
 void MP4Demuxer::onVideoTrack(uint32_t track, uint8_t object, int width, int height, const void *extra, size_t bytes) {
-    auto video = Factory::getTrackByCodecId(getCodecByMovId(object));
+    //cyf    写入的时候为了mov库正常走流程，把svac当做了264，这边读取的时候用extra来分辨264和svac
+
+    auto video = Factory::getTrackByCodecId(extra==NULL?CodecSVAC:getCodecByMovId(object));
+    //auto video = Factory::getTrackByCodecId(getCodecByMovId(object));
+
+
     if (!video) {
         return;
     }
@@ -144,6 +149,7 @@ Frame::Ptr MP4Demuxer::makeFrame(uint32_t track_id, const Buffer::Ptr &buf, int6
     auto codec = it->second->getCodecId();
     switch (codec) {
         case CodecH264:
+        case CodecSVAC:
         case CodecH265: {
             auto bytes = buf->size();
             auto data = buf->data();
