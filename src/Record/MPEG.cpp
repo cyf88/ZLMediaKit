@@ -53,6 +53,7 @@ bool MpegMuxer::inputFrame(const Frame::Ptr &frame) {
     _key_pos = !_have_video;
     switch (frame->getCodecId()) {
         case CodecH264:
+        case CodecSVAC:
         case CodecH265: {
             // 这里的代码逻辑是让SPS、PPS、IDR这些时间戳相同的帧打包到一起当做一个帧处理，
             return track.merger.inputFrame(frame, [this, &track](uint64_t dts, uint64_t pts, const Buffer::Ptr &buffer, bool have_idr) {

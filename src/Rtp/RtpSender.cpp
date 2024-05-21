@@ -248,6 +248,10 @@ bool RtpSender::addTrack(const Track::Ptr &track){
         // 如果只发送音频则忽略视频
         return false;
     }
+    //cyf test 不发送音频
+    if (track->getTrackType() == TrackAudio) {
+        return false;
+    }
     return _interface->addTrack(track);
 }
 
