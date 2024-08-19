@@ -437,6 +437,58 @@ typedef struct T_HEVCSPS {
     int iVuiPresent;
 }T_HEVCSPS;
 
+typedef struct T_SVACSPS {
+    int profile_id;
+    int level_id;
+    int ldp_mode_flag;
+    int frame_width_minus_1;
+    int frame_height_minus_1;
+    int chroma_format_idc;
+    int bit_depth;
+    int refs_per_frame;
+    int frame_rate;
+    int extended_sb_size_flag;
+    int tile_enable;
+    int wpp_enable;
+    int sao_enable;
+    int alf_enable;
+    int roi_flag;
+    int temporal_svc_flag;
+    int layer_num_minus_1;
+    int spatial_svc_flag;
+    int svc_ratio;
+    int svc_mode;
+
+    int vui_parameters_present_flag;
+
+    struct {
+        int timing_info_present_flag;
+        int num_units_in_tick;
+        int time_scale;
+        int fixed_frame_rate_flag;
+
+        int hrd_parameters_present_flag;
+
+        struct {
+            int cpb_cnt_minus1;
+            int bit_rate_scale;
+            int cpd_size_scale;
+            int bit_rate_value_minus1[32]; // up to cpb_cnt_minus1, which is <= 31
+            int cpb_size_value_minus1[32];
+            int cbr_flag[32];
+            int initial_cpb_removal_delay_length_minus1;
+            int pb_removal_delay_length_minus1;
+            int dpb_output_delay_length_minus1;
+        } hrd;
+
+        int low_delay_hrd_flag;
+
+        int max_dec_frame_buffering;
+
+    } vui;
+
+
+} T_SVACSPS;
 
 typedef struct T_GetBitContext{
     uint8_t *pu8Buf;       // buf 
@@ -447,9 +499,10 @@ typedef struct T_GetBitContext{
 }T_GetBitContext;
 
 
-int h264DecSeqParameterSet(void *pvBuf, T_SPS *ptSps);
-int h265DecSeqParameterSet( void *pvBufSrc, T_HEVCSPS *ptSps );
-int h265DecVideoParameterSet( void *pvBufSrc, T_HEVCVPS *ptVps );
+int h264DecSeqParameterSet(void *pvBufSrc, T_SPS *ptSps);
+int h265DecSeqParameterSet(void *pvBufSrc, T_HEVCSPS *ptSps);
+int svacDecSeqParameterSet(void *pvBufSrc, T_SVACSPS *ptSps);
+int h265DecVideoParameterSet(void *pvBufSrc, T_HEVCVPS *ptVps);
 
 
 void h264GetWidthHeight(T_SPS *ptSps, int *piWidth, int *piHeight);

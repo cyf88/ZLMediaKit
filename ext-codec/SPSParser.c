@@ -2019,7 +2019,6 @@ exit:
 
 }
 
-
 int h265DecVideoParameterSet( void *pvBufSrc, T_HEVCVPS *ptVps )
 {
     int iRet = 0;
@@ -2286,3 +2285,82 @@ void h265GeFramerate(T_HEVCVPS *ptVps, T_HEVCSPS *ptSps,float *pfFramerate)
     }
 }
 
+
+int svacDecSeqParameterSet(void *pvBufSrc, T_SVACSPS *ptSps) {
+
+    int iRet = 0;
+    void *pvBuf = NULL;
+
+    if(NULL == pvBufSrc || NULL == ptSps)
+    {
+        RPT(RPT_ERR,"ERR null pointer\n");
+        iRet = -1;
+        goto exit;
+    }
+    memset((void *)ptSps, 0, sizeof(T_SVACSPS));
+
+    pvBuf = deEmulationPrevention(pvBufSrc);
+    if(NULL == pvBuf)
+    {
+        RPT(RPT_ERR,"ERR null pointer\n");
+        iRet = -1;
+        goto exit;
+    }
+
+    ptSps->profile_id = getBits(pvBuf, 8);
+    ptSps->level_id = getBits(pvBuf, 8);
+    ptSps->ldp_mode_flag = getOneBit(pvBuf);
+    ptSps->frame_width_minus_1 = getBits(pvBuf, 16);
+    ptSps->frame_height_minus_1 = getBits(pvBuf, 16);
+    ptSps->chroma_format_idc = getBits(pvBuf, 2);
+    ptSps->bit_depth = getBits(pvBuf, 2);
+    ptSps->refs_per_frame = getBits(pvBuf, 3);
+    ptSps->frame_rate = getBits(pvBuf, 3);
+    ptSps->extended_sb_size_flag = getOneBit(pvBuf);
+    ptSps->tile_enable = getOneBit(pvBuf);
+    ptSps->wpp_enable = getOneBit(pvBuf);
+    ptSps->sao_enable = getOneBit(pvBuf);
+    ptSps->alf_enable = getOneBit(pvBuf);
+    ptSps->roi_flag = getOneBit(pvBuf);
+    ptSps->temporal_svc_flag = getOneBit(pvBuf);
+    if (ptSps->temporal_svc_flag) {
+        ptSps->layer_num_minus_1 = getBits(pvBuf, 2);
+    }
+    ptSps->spatial_svc_flag = getBits(pvBuf, 2);
+    if (ptSps->spatial_svc_flag) {
+        ptSps->svc_ratio = getBits(pvBuf, 3);
+        ptSps->svc_mode = getOneBit(pvBuf);
+    }
+    if (ptSps->frame_rate >= 4) {
+        ptSps->vui_parameters_present_flag = getOneBit(pvBuf);
+    }
+    if (ptSps->vui_parameters_present_flag) {
+        ptSps->vui.timing_info_present_flag = getOneBit(pvBuf);
+        if (ptSps->vui.timing_info_present_flag) {
+            ptSps->vui.num_units_in_tick = getBits(pvBuf, 32);
+            ptSps->vui.time_scale = getBits(pvBuf, 32);
+            ptSps->vui.fixed_frame_rate_flag = getOneBit(pvBuf);
+        }
+        ptSps->vui.hrd_parameters_present_flag = getOneBit(pvBuf);
+        if (ptSps->vui.hrd_parameters_present_flag) {
+            ptSps->vui.hrd.cpb_cnt_minus1 = parseUe(pvBuf);
+            ptSps->vui.hrd.bit_rate_scale = getBits(pvBuf, 4);
+            ptSps->vui.hrd.cpd_size_scale = getBits(pvBuf, 4);
+            for (int i=0; i<=ptSps->vui.hrd.cpb_cnt_minus1; i++) {
+                ptSps->vui.hrd.bit_rate_value_minus1[i] = parseUe(pvBuf);
+                ptSps->vui.hrd.cpb_size_value_minus1[i] = parseUe(pvBuf);
+                ptSps->vui.hrd.cbr_flag[i] = getOneBit(pvBuf);
+            }
+            ptSps->vui.hrd.initial_cpb_removal_delay_length_minus1 = getBits(pvBuf, 5);
+            ptSps->vui.hrd.pb_removal_delay_length_minus1 = getBits(pvBuf, 5);
+            ptSps->vui.hrd.dpb_output_delay_length_minus1 = getBits(pvBuf, 5);
+        }
+    }
+
+
+exit:
+    getBitContextFree(pvBuf);
+
+    return iRet;
+
+}

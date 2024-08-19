@@ -397,6 +397,7 @@ endif()
 # find openssl installed
 find_package(OpenSSL QUIET)
 if(OPENSSL_FOUND AND ENABLE_OPENSSL)
+ # list(APPEND MK_LINK_LIBRARIES ${OPENSSL_LIBRARIES} Crypt32.lib ws2_32.lib)
   message(STATUS "found library: ${OPENSSL_LIBRARIES}, ENABLE_OPENSSL defined")
   include_directories(${OPENSSL_INCLUDE_DIR})
   update_cached_list(MK_COMPILE_DEFINITIONS ENABLE_OPENSSL)

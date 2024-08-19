@@ -117,10 +117,10 @@ bool MP4MuxerInterface::inputFrame(const Frame::Ptr &frame) {
                 int64_t dts_out, pts_out;
                 track.stamp.revise(dts, pts, dts_out, pts_out);
                 //cyf test 写入mp4的数据
-                std::ofstream outfile2;
-                outfile2.open((std::string("D://svac//write//after//frameafter.") + std::to_string(i++)).c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
-                outfile2.write(buffer->data(), buffer->size());
-                outfile2.close();
+//                std::ofstream outfile2;
+//                outfile2.open((std::string("D://svac//write//after//frameafter.") + std::to_string(i++)).c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+//                outfile2.write(buffer->data(), buffer->size());
+//                outfile2.close();
                 mp4_writer_write(_mov_writter.get(), track.track_id, buffer->data(), buffer->size(), pts_out, dts_out, have_idr ? MOV_AV_FLAG_KEYFREAME : 0);
             });
             break;

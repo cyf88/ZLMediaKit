@@ -27,16 +27,23 @@ static bool getAVCInfo(const char *sps, size_t sps_len, int &iVideoWidth, int &i
        return false;
    }
    T_GetBitContext tGetBitBuf;
-   T_SPS tSVACSpsInfo;
+   T_SVACSPS tSVACSpsInfo;
    memset(&tGetBitBuf, 0, sizeof(tGetBitBuf));
    memset(&tSVACSpsInfo, 0, sizeof(tSVACSpsInfo));
    tGetBitBuf.pu8Buf = (uint8_t *)sps + 1;
    tGetBitBuf.iBufSize = (int)(sps_len - 1);
-   if (0 != h264DecSeqParameterSet((void *)&tGetBitBuf, &tSVACSpsInfo)) {
+   if (0 != svacDecSeqParameterSet((void *)&tGetBitBuf, &tSVACSpsInfo)) {
        return false;
    }
-   h264GetWidthHeight(&tSVACSpsInfo, &iVideoWidth, &iVideoHeight);
-   h264GeFramerate(&tSVACSpsInfo, &iVideoFps);
+   iVideoWidth = tSVACSpsInfo.frame_width_minus_1 + 1;
+   iVideoHeight = tSVACSpsInfo.frame_height_minus_1 + 1;
+   if (tSVACSpsInfo.frame_rate == 0) {
+       iVideoFps = 25;
+   } else if (tSVACSpsInfo.frame_rate == 1) {
+       iVideoFps = 30;
+   } else {
+       iVideoFps = tSVACSpsInfo.frame_rate;
+   }
    // ErrorL << iVideoWidth << " " << iVideoHeight << " " << iVideoFps;
    return true;
 }
@@ -166,7 +173,7 @@ bool SVACTrack::inputFrame(const Frame::Ptr &frame) {
 
 
 bool SVACTrack::update() {
-   return getAVCInfo(_sps, _width, _height, _fps);
+       return getAVCInfo(_sps, _width, _height, _fps);
 }
 
 Track::Ptr SVACTrack::clone() const {
